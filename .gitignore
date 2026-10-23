@@ -1,0 +1,4 @@
+node_modules/
+
+# Release archives live in GitHub Releases, not in the tree.
+*.zip

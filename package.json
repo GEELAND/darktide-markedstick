@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "node tools/sim_stick.js",
+    "release": "node tools/release_check.js"
+  },
+  "dependencies": {
+    "fengari": "^0.1.5"
+  }
+}
