@@ -1,6 +1,8 @@
-# Stick Skeleton
+# MarkedStick
 
 A neon stick-figure skeleton, drawn in the UI layer, on every elite or special your class ability marks.
+
+The mod list shows **MarkedStick** in every language: it is the mod's identity, and it is the same string as the folder and the `.mod` file, so what you enable in game is what you see in `mods/`.
 
 An outline lives in 3D and is sorted by depth, so a nearer enemy's outline always paints over a farther one. This is not an outline: it is a UI widget, drawn after every 3D pass, so nothing can cover it. It also says *which part* you are looking at -- head, torso, hands, feet -- which a silhouette cannot.
 
@@ -15,7 +17,7 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 
 1. Install DMF.
 2. Unzip `MarkedStick_v1.2.0.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
-3. Enable **Stick Skeleton** in the in-game mod list.
+3. Enable **MarkedStick** in the in-game mod list.
 
 **The zip must be unzipped.** Dropping the archive into `mods` does nothing -- the framework only scans `.mod` files, and a zipped mod simply never appears in the list.
 
@@ -78,7 +80,9 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 ## 中文速览
 
-**安装**：解压 `MarkedStick_v0.2.2.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用「竹节虫骨架」。需要 DMF 框架。
+**安装**：解压 `MarkedStick_v1.2.0.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用 **MarkedStick**。需要 DMF 框架。
+
+**名字**：mod 列表里三语都显示 **MarkedStick**（不再随语言翻译）——它就是 mod 的标识，和文件夹名、`.mod` 文件名完全一致。
 
 **它是干什么的**：给被职业技能标记的精英与专家画一副霓虹竹节虫骨架——躯干、头颈、锁骨、双臂、双腿由小珠子串成，头/躯干/双手/双脚各一个发光点。画在 UI 层，任何轮廓都盖不住它。
 

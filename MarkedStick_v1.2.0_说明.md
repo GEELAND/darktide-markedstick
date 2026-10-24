@@ -1,4 +1,7 @@
-# 竹节虫骨架（Stick Skeleton）1.2.0 说明
+# MarkedStick 1.2.0 说明
+
+> **游戏内名字**：mod 列表里三语都显示 **MarkedStick**（不再叫 Stick Skeleton，也不再翻译成中文名）
+> —— 它就是 mod 的标识，和文件夹名、`.mod` 文件名完全一致。内部标识符一直没变，覆盖安装设置不丢。
 
 ## 0. 先看这一条：zip 必须解压
 
@@ -9,7 +12,7 @@
 解压 MarkedStick_v1.2.0.zip → 得到 MarkedStick/ 文件夹
 放到 <游戏目录>/mods/MarkedStick/
 确认 <游戏目录>/mods/MarkedStick/MarkedStick.mod 存在
-进游戏 → mod 列表启用「竹节虫骨架」→ 重启或重载
+进游戏 → mod 列表启用「MarkedStick」→ 重启或重载
 ```
 
 覆盖安装，设置不丢。

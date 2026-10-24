@@ -3,8 +3,18 @@
 The public version numbering starts here. Earlier internal iteration numbers
 are archived under `build/dev/` and never shipped.
 
+> **Display-name fix, applied to the 1.1.0 zip as well.** The mod list used to
+> show "Stick Skeleton", while the folder, the `.mod` file and the mod id have
+> always been MarkedStick. Both zips were rebuilt with that one string changed
+> -- English, Simplified Chinese and Traditional Chinese now all read
+> **MarkedStick**. Nothing else in either build differs.
+
 ## 1.2.0
 
+- The mod list shows **MarkedStick** in every language instead of
+  "Stick Skeleton". The name is the mod's identity and now matches the folder,
+  the `.mod` file and the mod id exactly, which is also what the release page
+  calls it.
 - Your marks stay yours. A target holds exactly one tag, so a teammate who
   re-tags the enemy you marked takes that tag in the game's own books -- the
   skeleton used to follow the tag and turn into their colour. Ownership is now

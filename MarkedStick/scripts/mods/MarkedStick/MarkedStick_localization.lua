@@ -1,4 +1,10 @@
 return {
+	-- The name the mod list shows. It is the same in every language on purpose:
+	-- it is the mod's identity, not a description, so it is not translated --
+	-- a player comparing two screenshots of the list should see one name.
+	-- The internal identifiers (folder, .mod file, mod id, template name, every
+	-- setting key) have always been MarkedStick, so this only makes the visible
+	-- name agree with them.
 	mod_name = {
 		en = "MarkedStick",
 		["zh-cn"] = "MarkedStick",

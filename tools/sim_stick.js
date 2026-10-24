@@ -2227,16 +2227,17 @@ out[#out + 1] = (#half == 0 and "PASS  " or "FAIL  ")
 	.. "every key exists in English, Simplified and Traditional Chinese (" .. #half .. " missing)"
 for i = 1, #half do out[#out + 1] = "      missing: " .. half[i] end
 
--- And the Traditional strings must actually BE traditional: the mod name is
--- the one place a reader can check by eye, so it is checked by content. (The
--- loc source is read as UTF-8 for this check, so whole-string comparison
--- works; the percent guard above is byte-based and unaffected either way.)
-local name_tw = rendered["mod_name/zh-tw"]
-out[#out + 1] = (name_tw == "竹節蟲骨架" and "PASS  " or "FAIL  ")
-	.. "the mod name is the stick-insect skeleton in all three languages"
-	.. " (en=" .. tostring(rendered["mod_name/en"]) ..
-	   ", zh-cn=" .. tostring(rendered["mod_name/zh-cn"]) ..
-	   ", zh-tw=" .. tostring(name_tw) .. ")"
+-- The name in the mod list is the mod's identity, not a description, so it is
+-- the same string in every language -- and it is the same string as the folder,
+-- the .mod file and the mod id. A translated or "prettier" name here would show
+-- the player two different products: one in the list, one in the folder tree.
+local names = { rendered["mod_name/en"], rendered["mod_name/zh-cn"], rendered["mod_name/zh-tw"] }
+local named = names[1] == "MarkedStick" and names[2] == names[1] and names[3] == names[1]
+out[#out + 1] = (named and "PASS  " or "FAIL  ")
+	.. "the mod name is MarkedStick in all three languages, untranslated"
+	.. " (en=" .. tostring(names[1]) ..
+	   ", zh-cn=" .. tostring(names[2]) ..
+	   ", zh-tw=" .. tostring(names[3]) .. ")"
 
 -- The Simplified strings must NOT have leaked traditional glyphs the other way:
 -- a copy-paste between the two columns would otherwise pass unnoticed. Plain
@@ -2570,6 +2571,17 @@ rline(markerText.includes("template.last = LAST"),
 
 // The .mod manifest.
 rline(modText.includes('new_mod("MarkedStick"'), "the .mod registers MarkedStick");
+
+// The display name and the identifier must be the SAME string. This is the one
+// place where a "prettier" name would slip through: the list would say one
+// thing and the folder, the .mod file and the mod id another. The block is read
+// as latin1, so any non-ASCII byte in it means a translated variant crept in.
+const locBytes = fs.readFileSync(path.join(MOD, "MarkedStick_localization.lua"), "latin1");
+const nameBlock = (locBytes.match(/mod_name\s*=\s*\{([\s\S]*?)\n\t\},/) || [])[1] || "";
+rline((nameBlock.match(/MarkedStick/g) || []).length === 3,
+  "the in-game name is MarkedStick in all three languages (" + (nameBlock.match(/MarkedStick/g) || []).length + "/3)");
+rline(nameBlock.length > 0 && !/[\x80-\xff]/.test(nameBlock),
+  "and the name block carries no translated variant");
 rline(modText.includes("MarkedStick/scripts/mods/MarkedStick/MarkedStick")
   && modText.includes("MarkedStick/scripts/mods/MarkedStick/MarkedStick_data")
   && modText.includes("MarkedStick/scripts/mods/MarkedStick/MarkedStick_localization"),
