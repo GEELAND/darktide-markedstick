@@ -286,38 +286,101 @@ local G = mkunit("G", 12, { name = "chaos_ogryn_bulgrym", tags = { elite = true,
 local outline_system = { _unit_extension_data = {} }
 
 -- The game's smart tag bookkeeping, in the shape SmartTagSystem exposes it: a
--- target unit carries at most one tag, and the tag knows who made it through
--- tagger_player / tagger_unit. A nil entry means "no smart tag at all", which
--- is the class-keystone case.
-local smart_tag_system = { _tags = {} }
+-- target unit carries at most one tag, the tag knows who made it through
+-- tagger_player / tagger_unit, and the tagger's own extension lists the ids it
+-- created (owned_tag_ids). A nil entry means "no smart tag at all", which is
+-- the class-keystone case.
+local smart_tag_system = { _tags = {}, _unit_extension_data = {}, _next_tag_id = 0 }
 
 function smart_tag_system.unit_tag(self, unit)
 	return self._tags[unit]
 end
 
 function smart_tag_system.unit_tag_id(self, unit)
-	return self._tags[unit] and 1 or nil
+	local tag = self._tags[unit]
+
+	return tag and tag.__id or nil
+end
+
+-- One extension per unit, exactly as the game splits it: a target keeps a
+-- single tag id, a tagger keeps the list of ids it owns.
+local function tag_extension()
+	local ext = { _owned = {}, _tag_id = nil }
+
+	function ext.owned_tag_ids(self) return self._owned end
+	function ext.register_owned_tag(self, id) self._owned[#self._owned + 1] = id end
+	function ext.tag_id(self) return self._tag_id end
+	function ext.register_tag(self, id) self._tag_id = id end
+
+	return ext
 end
 
 local me_unit = { name = "me" }
 local ME = { player_unit = me_unit }
-local ALLY = { player_unit = { name = "ally" } }
+local ally_unit = { name = "ally" }
+local ALLY = { player_unit = ally_unit }
 
-local function new_tag(player)
+smart_tag_system._unit_extension_data[me_unit] = tag_extension()
+smart_tag_system._unit_extension_data[ally_unit] = tag_extension()
+
+local function new_tag(player, id)
 	return {
+		__id = id,
 		__player = player,
 		__unit = player and player.player_unit or nil,
+		id = function(self) return self.__id end,
 		tagger_player = function(self) return self.__player end,
 		tagger_unit = function(self) return self.__unit end,
 	}
 end
 
 local function tag_by(player, unit)
-	smart_tag_system._tags[unit] = new_tag(player)
+	smart_tag_system._next_tag_id = smart_tag_system._next_tag_id + 1
+
+	local id = smart_tag_system._next_tag_id
+
+	smart_tag_system._tags[unit] = new_tag(player, id)
+
+	local target_ext = smart_tag_system._unit_extension_data[unit]
+
+	if target_ext then
+		target_ext:register_tag(id)
+	end
+
+	if player then
+		local tagger_ext = smart_tag_system._unit_extension_data[player.player_unit]
+
+		if tagger_ext then
+			tagger_ext:register_owned_tag(id)
+		end
+	end
 end
 
 local function untag(unit)
+	local tag = smart_tag_system._tags[unit]
+
 	smart_tag_system._tags[unit] = nil
+
+	if tag and tag.__player then
+		local ext = smart_tag_system._unit_extension_data[tag.__player.player_unit]
+
+		if ext then
+			for i = #ext._owned, 1, -1 do
+				if ext._owned[i] == tag.__id then
+					table.remove(ext._owned, i)
+				end
+			end
+		end
+	end
+end
+
+local function reset_tags()
+	smart_tag_system._tags = {}
+
+	for _, ext in pairs(smart_tag_system._unit_extension_data) do
+		ext._owned = {}
+		ext._tag_id = nil
+	end
 end
 local hud_element = {
 	_parent = { player_camera = function(self) return camera end },
@@ -341,7 +404,17 @@ local removed_ids = {}
 
 Managers = {
 	player = {
-		local_player = function(self) return ME end,
+		-- Mirrors the real manager on purpose: it takes a player INDEX, and
+		-- calling it with no argument answers nil. That call shape is what
+		-- broke attribution in the field ("my marks show a teammate's
+		-- colour"), so the stub keeps it instead of papering over it.
+		local_player = function(self, index)
+			if index ~= 1 then
+				return nil
+			end
+
+			return ME
+		end,
 	},
 	state = {
 		extension = {
@@ -1852,7 +1925,7 @@ end
 
 local function owner_tests()
 	keep_only({})
-	smart_tag_system._tags = {}
+	reset_tags()
 
 	SETTINGS.stick_rgb = false
 	SETTINGS.stick_other_rgb = false
@@ -1881,6 +1954,25 @@ local function owner_tests()
 		"a teammate's tag is painted with theirs")
 	check(same_colour(body_rgb(draw(keystone, 0)), SETTINGS.stick_color),
 		"a mark with no smart tag at all (the class keystone) counts as mine")
+
+	-- The bug that shipped in 0.2.1: the player manager takes an INDEX, so a
+	-- no-argument call answered nil. "Who am I" was empty, so every tagged
+	-- enemy fell through to "somebody else" and was painted with the teammates'
+	-- colour set -- which also made the player's own switches look dead.
+	check(Managers.player:local_player() == nil and Managers.player:local_player(1) == ME,
+		"the player manager only answers when asked with an index (the shape that broke attribution)")
+	check(same_colour(body_rgb(draw(mine, 0)), SETTINGS.stick_color),
+		"and my own mark is still attributed to me")
+
+	echo_lines = {}
+	commands.stick_own()
+
+	local own_diag = table.concat(echo_lines, " | ")
+
+	check(string.find(own_diag, "owner: player=yes", 1, true) ~= nil,
+		"/stick_own resolves the local player")
+	check(string.find(own_diag, "tag=", 1, true) ~= nil,
+		"and prints the tag id behind each mark")
 
 	-- Independent cycles. With mine off and theirs on, the teammate's hue has to
 	-- drift, and my own colour has to sit still -- a shared origin would let the
@@ -1914,11 +2006,21 @@ local function owner_tests()
 	check(same_colour(body_rgb(draw(mine, 0)), SETTINGS.stick_color),
 		"and taking it back paints it with mine again")
 
+	-- Switching the teammates' set off mid-fight has to remove what is already
+	-- on screen, not wait for the affected enemy to be re-tagged.
+	SETTINGS.stick_other_enabled = false
+	mod.update(0.016)
+
+	check(not has_marker(theirs), "switching teammates' marks off removes the one already on screen")
+	check(has_marker(mine), "while my own mark stays")
+
+	SETTINGS.stick_other_enabled = true
+
 	-- Teammates' marks switched off: only my own enemies get a skeleton, and the
 	-- diagnostics say how many were filtered instead of leaving it a mystery.
 	SETTINGS.stick_other_enabled = false
 	keep_only({})
-	smart_tag_system._tags = {}
+	reset_tags()
 
 	outline_system._unit_extension_data[mine] = { outlines = { { name = "veteran_smart_tag" } } }
 	outline_system._unit_extension_data[theirs] = { outlines = { { name = "veteran_smart_tag" } } }
@@ -1940,13 +2042,28 @@ local function owner_tests()
 	check(string.find(diag, "hidden=1", 1, true) ~= nil, "and the diag counts the one that was filtered")
 	check(string.find(diag, "mine=1", 1, true) ~= nil, "while still counting mine")
 
+	-- The master switch owns the skeletons: off means gone, never frozen.
+	SETTINGS.stick_enabled = false
+	mod.update(0.3)
+
+	check(not has_marker(mine), "the master switch takes the skeletons down with it")
+
+	local off_frame = draw(mine, 0)
+
+	check(not off_frame.style.b2_1_c.visible, "and a widget cannot draw a frame while it is off")
+
+	SETTINGS.stick_enabled = true
+	mod.update(0.3)
+
+	check(has_marker(mine), "turning it back on brings the mark straight back")
+
 	SETTINGS.stick_other_enabled = true
 	SETTINGS.stick_rgb = true
 	SETTINGS.stick_other_rgb = true
 	SETTINGS.stick_breath = true
 	SETTINGS.stick_other_breath = true
 
-	smart_tag_system._tags = {}
+	reset_tags()
 	keep_only({})
 end
 
@@ -2402,6 +2519,7 @@ rline(markerText.includes("template.rig = RIG") && markerText.includes("template
 rline(mainText.includes('mod:command("stick_rig"') && mainText.includes('mod:command("stick_diag"'),
   "both chat commands exist under their own names");
 rline(mainText.includes('mod:command("stick_glow"'), "the glow probe command exists as well");
+rline(mainText.includes('mod:command("stick_own"'), "and so does the attribution probe");
 rline(markerText.includes("template.last = LAST"),
   "the marker exposes the last frame's numbers for /stick_glow");
 

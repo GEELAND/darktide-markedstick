@@ -92,6 +92,9 @@ local dropped = 0
 -- that set off. Counted so /stick_diag can tell "nothing to show" apart from
 -- "filtered on purpose".
 local other_hidden = 0
+-- Whether the previous frame was actually drawing. Drives the one-shot teardown
+-- when the master switch goes off.
+local running = false
 
 -- Reused every frame, so the per-frame path allocates nothing.
 local scratch = {}
@@ -148,6 +151,9 @@ local function breed_of(unit)
 	return ok2 and breed or nil
 end
 
+-- The local player. `local_player` takes a player INDEX: called with no
+-- argument it answers nil, and a nil answer here used to make every tagged
+-- enemy look like somebody else's, because "who am I" was empty.
 local function local_player()
 	local manager = Managers.player
 
@@ -155,9 +161,56 @@ local function local_player()
 		return nil
 	end
 
-	local ok, player = pcall(manager.local_player, manager)
+	local ok, player = pcall(manager.local_player, manager, 1)
+
+	if ok and player then
+		return player
+	end
+
+	-- Some builds resolve the index themselves; keep that as a fallback rather
+	-- than hard-coding a single call shape.
+	ok, player = pcall(manager.local_player, manager)
 
 	return ok and player or nil
+end
+
+local function smart_tag_system()
+	local manager = Managers.state and Managers.state.extension
+
+	if not manager or not manager.has_system then
+		return nil
+	end
+
+	local ok_has, has = pcall(manager.has_system, manager, "smart_tag_system")
+
+	if not ok_has or not has then
+		return nil
+	end
+
+	local ok_get, system = pcall(manager.system, manager, "smart_tag_system")
+
+	return ok_get and system or nil
+end
+
+-- The ids this unit has tagged, straight from the game's own bookkeeping: the
+-- tagger's smart-tag extension appends every tag id it creates
+-- (`register_owned_tag` / `owned_tag_ids`). Comparing ids is integer equality,
+-- so it cannot be fooled by a respawn, a proxy object or a stale player_unit.
+local function owned_tag_ids(system, unit)
+	local data = system and system._unit_extension_data
+	local extension = data and data[unit]
+
+	if not extension then
+		return nil
+	end
+
+	local ok, ids = pcall(extension.owned_tag_ids, extension)
+
+	if not ok or type(ids) ~= "table" then
+		return nil
+	end
+
+	return ids
 end
 
 local function same_player(a, b)
@@ -176,69 +229,105 @@ end
 
 -- Whose tag is on this unit.
 --
--- The game keeps the answer itself: every smart tag carries the unit and the
--- Player that created it (`tagger_unit` / `tagger_player`), and
--- `smart_tag_system:unit_tag()` hands the tag back. One target unit holds at
--- most ONE tag at a time (the tag extension keeps a single tag id, and a
+-- The game keeps the answer itself. Every smart tag carries the unit and the
+-- Player that created it (`tagger_unit` / `tagger_player`), and the tagger's
+-- own extension lists the ids it owns, which is the primary check below: tag
+-- ids are integers, so there is no identity assumption to get wrong. One target
+-- holds at most ONE tag at a time (the extension keeps a single tag id, and a
 -- second tag only lands if its template allows overriding), so a marked enemy
--- is either yours or somebody else's -- the two looks never have to coexist
--- on one body.
+-- is either yours or somebody else's.
 --
 --   true  -> the local player tagged it
---   false -> another player tagged it, or the tag outlived the player who
---            made it (a tag whose owner left keeps no tagger, and it cannot
---            be ours: ours always keeps its tagger)
---   nil   -> there is no smart tag at all. That is the class-keystone mark
---            (`psyker_marked_target`, `adamant_mark_target`), which is
---            personal by construction, so the caller reads nil as "mine".
---
--- On any failure the answer is nil as well: a HUD that paints an unknown tag
--- with the player's own colours is wrong in a harmless direction, whereas one
--- that silently stops drawing is the failure this project has paid for.
+--   false -> another player tagged it, or the tag outlived the player who made
+--            it (a tag whose owner left keeps no tagger, and it cannot be ours)
+--   nil   -> unknown, or there is no smart tag at all. The class keystones
+--            (`psyker_marked_target`, `adamant_mark_target`) mark without a
+--            tag and are personal by construction, so the caller reads nil as
+--            "mine"; so does a frame in which the local player is not resolvable
+--            yet. Painting an unknown tag with the player's own colours is
+--            wrong in the harmless direction, accusing the player's own mark of
+--            being a teammate's is the bug this function kept shipping.
 local function tag_owner(unit)
-	local manager = Managers.state and Managers.state.extension
+	local system = smart_tag_system()
 
-	if not manager or not manager.has_system then
-		return nil
-	end
-
-	local ok_system, has = pcall(manager.has_system, manager, "smart_tag_system")
-
-	if not ok_system or not has then
-		return nil
-	end
-
-	local ok_get, system = pcall(manager.system, manager, "smart_tag_system")
-
-	if not ok_get or not system then
+	if not system then
 		return nil
 	end
 
 	local ok_tag, tag = pcall(system.unit_tag, system, unit)
 
-	if not ok_tag or not tag then
+	if not ok_tag then
 		return nil
 	end
 
-	local me = local_player()
+	if not tag then
+		return nil
+	end
+
+	local player = local_player()
+	local my_unit = player and player.player_unit
+	local ok_id, tag_id = pcall(system.unit_tag_id, system, unit)
+
+	-- Primary: is this tag id in my own list?
+	if my_unit and ok_id and tag_id then
+		local ids = owned_tag_ids(system, my_unit)
+
+		if ids then
+			for i = 1, #ids do
+				if ids[i] == tag_id then
+					return true
+				end
+			end
+
+			-- A tag is on the enemy and it is not mine.
+			return false
+		end
+	end
+
+	-- Fallback: the tag's own record.
 	local ok_player, tagger_player = pcall(tag.tagger_player, tag)
 
-	if ok_player and tagger_player and me then
-		return same_player(tagger_player, me)
+	if ok_player and tagger_player then
+		if player and same_player(tagger_player, player) then
+			return true
+		end
+
+		local tagger_unit = tagger_player.player_unit
+
+		if tagger_unit and my_unit then
+			return tagger_unit == my_unit
+		end
 	end
 
 	local ok_unit, tagger_unit = pcall(tag.tagger_unit, tag)
-	local my_unit = me and me.player_unit
 
-	if ok_unit and tagger_unit and my_unit then
-		return tagger_unit == my_unit
+	if ok_unit and tagger_unit then
+		if my_unit then
+			return tagger_unit == my_unit
+		end
+
+		-- We could not establish our own unit this frame. Do not accuse.
+		return nil
 	end
 
+	-- A tag with no tagger at all: its owner is gone, so it cannot be ours.
 	return false
 end
 
-local function own_mark(unit)
-	return tag_owner(unit) ~= false
+-- Sticky by design: a frame in which the tag cannot be attributed keeps the
+-- previous verdict instead of repainting the skeleton a different colour.
+local function own_mark(unit, previous)
+	local verdict = tag_owner(unit)
+
+	if verdict == nil then
+		if previous ~= nil then
+			return previous
+		end
+
+		return true
+	end
+
+	return verdict
 end
 
 -- Only elites and specials get skeletons: a marked poxwalker is not worth a
@@ -393,7 +482,7 @@ local function refresh_owner(unit)
 		return
 	end
 
-	local own = own_mark(unit)
+	local own = own_mark(unit, record.own)
 
 	if own == record.own then
 		return
@@ -401,10 +490,6 @@ local function refresh_owner(unit)
 
 	record.own = own
 	StickMarker.set_own(unit, own)
-
-	if not own and not others_enabled() then
-		drop_unit(Managers.event, unit)
-	end
 end
 
 -- Everything that has to be true for a skeleton to stay on screen.
@@ -434,6 +519,10 @@ local function enforce()
 	local system = get_outline_system()
 	local data = system and system._unit_extension_data
 	local count = 0
+	-- One settings read for the whole pass: switching "teammates' marks" off has
+	-- to take the skeletons that are already on screen with it, not wait for
+	-- the affected enemy to be re-tagged.
+	local keep_others = others_enabled()
 
 	for unit in pairs(live) do
 		count = count + 1
@@ -452,6 +541,12 @@ local function enforce()
 			dropped = dropped + 1
 		else
 			pcall(refresh_owner, unit)
+
+			local record = live[unit]
+
+			if record and not record.own and not keep_others then
+				drop_unit(event_manager, unit)
+			end
 		end
 	end
 end
@@ -561,8 +656,17 @@ function mod.update(a, b)
 	end
 
 	if not mod:get("stick_enabled") then
+		-- The master switch owns the skeletons too. Without this the markers
+		-- stayed up, frozen on their last frame, and the switch looked dead.
+		if running then
+			running = false
+			pcall(drop_all)
+		end
+
 		return
 	end
+
+	running = true
 
 	-- Per frame, not per scan: re-tagging and dying both have to look instant.
 	local ok_enforce = pcall(enforce)
@@ -595,6 +699,7 @@ mod.on_disabled = function()
 
 	registered = false
 	cached_wm = nil
+	running = false
 	error_count = 0
 	skipped = 0
 	no_breed = 0
@@ -607,6 +712,7 @@ mod.on_game_state_changed = function(status, state_name)
 		live = {}
 		registered = false
 		cached_wm = nil
+		running = false
 		skipped = 0
 		no_breed = 0
 		dropped = 0
@@ -740,6 +846,47 @@ mod:command("stick_glow", "MarkedStick: print the glow numbers of the last drawn
 		pads and string.format("%.2f", pads.mid) or "off",
 		pads and string.format("%.2f", pads.inn) or "off"
 	))
+end)
+
+-- Attribution, as the game reports it. `my_tags` is the number of tag ids the
+-- engine says this player owns; a mark whose id is not in that list belongs to
+-- somebody else, and that is the whole rule. One line here settles "my marks
+-- are painted a teammate's colour" without guessing.
+mod:command("stick_own", "MarkedStick: print how the marks were attributed", function()
+	local player = local_player()
+	local system = smart_tag_system()
+	local my_unit = player and player.player_unit
+	local ids = my_unit and owned_tag_ids(system, my_unit)
+
+	mod:echo(string.format(
+		"owner: player=%s unit=%s my_tags=%s",
+		player and "yes" or "NO",
+		my_unit and tostring(my_unit) or "none",
+		ids and tostring(#ids) or "?"
+	))
+
+	local shown = 0
+
+	for unit, record in pairs(live) do
+		if shown < 4 then
+			shown = shown + 1
+
+			local tag_id = nil
+
+			if system then
+				local ok, id = pcall(system.unit_tag_id, system, unit)
+
+				tag_id = ok and id or nil
+			end
+
+			mod:echo(string.format(
+				"  %s -> %s (tag=%s)",
+				tostring(unit),
+				record.own and "MINE" or "THEIRS",
+				tostring(tag_id)
+			))
+		end
+	end
 end)
 
 -- ---------------------------------------------------------------------------

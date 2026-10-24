@@ -1056,6 +1056,13 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 
 	local mod = get_mod("MarkedStick")
 
+	-- The master switch owns this widget as well. The scanner tears the markers
+	-- down when it goes off; this is the belt to that braces, so not a single
+	-- frame of skeleton can survive a switch that is off.
+	if mod and not get_flag(mod, "stick_enabled", true) then
+		return
+	end
+
 	-- Whose mark this is decides which colour set paints it. `is_own` returns
 	-- false only when the scan positively identified another player's tag.
 	local own = template.is_own(unit)

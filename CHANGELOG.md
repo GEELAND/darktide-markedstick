@@ -3,6 +3,23 @@
 The public version numbering starts here. Earlier internal iteration numbers
 are archived under `build/dev/` and never shipped.
 
+## 0.2.2
+
+- Fixed: the player's own marks were painted with the teammates' colour set.
+  Cause: the player manager takes a player *index*, so `local_player()` answered
+  nil, "who am I" was empty and every tagged enemy fell through to "somebody
+  else". Attribution now compares the tag id against the ids the game records on
+  the player's own tag extension (integer equality, no identity assumption), and
+  a frame that cannot be attributed keeps the previous verdict instead of
+  repainting.
+- Fixed: the switches did nothing while skeletons were already on screen. The
+  master switch now tears the markers down, and turning "teammates' marks" off
+  removes the teammate skeletons that are up rather than waiting for a re-tag.
+  Both were also why the player's own colour/cycle settings looked dead: the
+  wrong colour set was drawing.
+- New `/stick_own`: which player the game thinks you are, how many tag ids it
+  says you own, and the tag id behind each live mark.
+
 ## 0.2.1
 
 - Bead count range widened to 2-24 (was 4-14). The ceiling now bites both at
