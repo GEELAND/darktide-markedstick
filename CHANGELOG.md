@@ -3,6 +3,22 @@
 The public version numbering starts here. Earlier internal iteration numbers
 are archived under `build/dev/` and never shipped.
 
+## 1.1.0
+
+Public numbering moves to 1.x, matching the release line the mod was published
+under. Nothing was rewritten -- this is the 1.0 look, tuned.
+
+- New shipped defaults, taken from the approved screenshots: joint dots 200
+  (was 120), beads per segment 24 (was 14), teammates' line weight 8 (was 6)
+  and teammates' joint dots 150 (was 120). The two colour sets are now equally
+  thick; the colour is what tells them apart.
+- Honest tooltips: with the shipped 8 px cord the bead ceiling only binds up
+  close, because every segment is already full well below 14 at range. The
+  slider still has its full 2-24 range, it just does what it says and no more.
+- Everything from 0.2.2 is included: attribution compares tag ids against the
+  player's own tag list, the master switch and the teammates switch act on
+  skeletons already on screen, and `/stick_own` reports the attribution.
+
 ## 0.2.2
 
 - Fixed: the player's own marks were painted with the teammates' colour set.

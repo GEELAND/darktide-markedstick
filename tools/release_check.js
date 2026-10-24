@@ -70,17 +70,58 @@ const zips = fs.existsSync(BUILD_DIR)
 	? fs.readdirSync(BUILD_DIR).filter((f) => f.toLowerCase().endsWith(".zip"))
 	: [];
 
-check(zips.length === 1, "build/ holds exactly one release zip (history lives in build/dev/)",
-	zips.length + " found: " + (zips.join(", ") || "none"));
+const expected = "MarkedStick_v" + version + ".zip";
 
-if (zips.length === 1) {
-	const expected = "MarkedStick_v" + version + ".zip";
-	check(zips[0] === expected, "the zip is named after the same version", "expected " + expected + ", found " + zips[0]);
+// The rule is about which file can be uploaded by mistake, not about tidiness:
+//   * the zip for THIS version must exist exactly once, named after it;
+//   * no zip may claim a version NEWER than the .mod (that is a mismatch);
+//   * an older leftover is a warning, not a failure -- it cannot be uploaded as
+//     this release, and a file held open by another program (an archive viewer,
+//     say) would otherwise leave the gate red for reasons unrelated to the
+//     release. Delete it when the handle is gone.
+const versionOf = (name) => {
+	const m = name.match(/^MarkedStick_v(\d+)\.(\d+)\.(\d+)\.zip$/i);
+
+	return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+};
+
+const mine = zips.filter((z) => z === expected);
+const others = zips.filter((z) => z !== expected);
+const current = versionOf(expected);
+const newer = others.filter((z) => {
+	const v = versionOf(z);
+
+	if (!v || !current) {
+		return true; // unparseable name: cannot prove it is older
+	}
+
+	for (let i = 0; i < 3; i++) {
+		if (v[i] !== current[i]) {
+			return v[i] > current[i];
+		}
+	}
+
+	return false;
+});
+
+check(mine.length === 1, "build/ holds exactly one zip for " + version,
+	mine.length + " found" + (others.length ? ", plus " + others.length + " older" : ""));
+
+check(newer.length === 0, "no zip in build/ claims a newer version than the .mod",
+	newer.length ? newer.join(", ") : "none");
+
+for (const z of others) {
+	if (!newer.includes(z)) {
+		lines.push("WARN  stale " + z + " still in build/ -- not this release, delete it when nothing has it open");
+	}
+}
+
+if (mine.length === 1) {
 
 	// Staleness: the zip has to be newer than the newest source file, or it was
 	// built before the last edit. A tolerance of two seconds keeps a fresh git
 	// clone (where every mtime is checkout time) from warning spuriously.
-	const zipTime = fs.statSync(path.join(BUILD_DIR, zips[0])).mtimeMs;
+	const zipTime = fs.statSync(path.join(BUILD_DIR, expected)).mtimeMs;
 	let newest = 0;
 	let newestName = "";
 

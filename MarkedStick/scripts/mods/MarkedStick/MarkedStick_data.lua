@@ -126,14 +126,13 @@ return {
 			-- The dot is a share of the line width, so "bigger than the
 			-- line" survives every distance. The floor of 180 percent is a
 			-- hard constraint, not a default: below it the joint dots stop
-			-- reading as dots. The shipped default of 120 sits BELOW that
-			-- floor on purpose -- with the default thickness of 8 the floor
-			-- is what you see, and the slider only starts to bite above 180.
+			-- reading as dots. The shipped default of 200 is above that floor,
+			-- so the dots read as joints rather than as slightly fat beads.
 			setting_id = "stick_dot_size",
 			type = "numeric",
 			title = "stick_dot_size_title",
 			tooltip = "stick_dot_size_description",
-			default_value = 120,
+			default_value = 200,
 				range = { 120, 300 },
 				decimals_number = 0,
 				step_size_value = 10,
@@ -142,8 +141,8 @@ return {
 			-- ------------------------------------------------------------------
 			-- Marks made by OTHER players. Same list as the block above, behind
 			-- `stick_other_`, so the two sets are complete rather than a token
-			-- colour swap. Default cyan and a slightly thinner line: an
-			-- untouched install already tells the two apart at a glance, and
+			-- colour swap. Default cyan: an untouched install already tells the
+			-- two apart at a glance, and
 			-- your own mark stays the louder of the pair.
 			-- ------------------------------------------------------------------
 			setting_id = "stick_other_enabled",
@@ -217,7 +216,7 @@ return {
 			type = "numeric",
 			title = "stick_other_thickness_title",
 			tooltip = "stick_other_thickness_description",
-			default_value = 6,
+			default_value = 8,
 				range = { 1, 8 },
 				decimals_number = 0,
 				step_size_value = 1,
@@ -237,7 +236,7 @@ return {
 			type = "numeric",
 			title = "stick_other_dot_size_title",
 			tooltip = "stick_other_dot_size_description",
-			default_value = 120,
+			default_value = 150,
 				range = { 120, 300 },
 				decimals_number = 0,
 				step_size_value = 10,
@@ -251,7 +250,7 @@ return {
 				type = "numeric",
 				title = "stick_density_title",
 				tooltip = "stick_density_description",
-				default_value = 14,
+				default_value = 24,
 				range = { 2, 24 },
 				decimals_number = 0,
 				step_size_value = 1,

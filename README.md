@@ -14,7 +14,7 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 ## Install
 
 1. Install DMF.
-2. Unzip `MarkedStick_v0.2.2.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
+2. Unzip `MarkedStick_v1.1.0.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
 3. Enable **Stick Skeleton** in the in-game mod list.
 
 **The zip must be unzipped.** Dropping the archive into `mods` does nothing -- the framework only scans `.mod` files, and a zipped mod simply never appears in the list.
@@ -42,16 +42,16 @@ Range never takes the lines away. The chains and the joint dots are drawn at eve
 | Breathing / depth / speed | on / 40 / 300 | sine brightness sway; depth is capped at 80 so it can never blink out |
 | Line thickness | 8 | bead core width in pixels at close range |
 | Glow | 50 | halo spread and brightness; 0 leaves only the lit cores. A small pixel floor keeps it working at range |
-| Joint dot size | 120 | percentage of line width, floored at 180 % |
+| Joint dot size | 200 | percentage of line width; 180 % is the hard floor |
 | Teammates' marks | on | draw enemies a teammate tagged too; off draws yours only |
 | Teammates' colour / head colour | cyan | their own set, independent of yours |
 | Teammates' cycle / speed | on / 100 | their cycle has its own origin and speed |
 | Teammates' breathing / depth / speed | on / 40 / 300 | independent of your own breathing |
-| Teammates' thickness / glow / joint size | 6 / 50 / 120 | a touch thinner by default, so your own mark stays the louder one |
-| Beads per segment | 14 | ceiling, 2-24. Also the performance lever |
+| Teammates' thickness / glow / joint size | 8 / 50 / 150 | same weight as yours; their joints sit on the 180 % floor |
+| Beads per segment | 24 | ceiling, 2-24. Bites up close only. Also the performance lever |
 | Head / torso / arms / legs / distance | on | per-group switches, shared by both sets |
 
-With the default thickness of 8 the joint dots sit on their 1.8x floor, so the size slider only starts to bite above 180.
+The joint dot size is a percentage of the line width and can never go below 180 %; with the shipped 200 the dots sit clearly above that floor.
 
 ## Commands
 
@@ -81,7 +81,7 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 **它是干什么的**：给被职业技能标记的精英与专家画一副霓虹竹节虫骨架——躯干、头颈、锁骨、双臂、双腿由小珠子串成，头/躯干/双手/双脚各一个发光点。画在 UI 层，任何轮廓都盖不住它。
 
-**默认外观**：粗细 8、霓虹强度 50、关节点 120、呼吸开启（强度 40、速度 300）、RGB 循环开启。全部 28 项设置都可在菜单里改。
+**默认外观**（1.1.0 定版）：粗细 8、霓虹强度 50、关节点 200、每段珠子 24、呼吸开启（强度 40、速度 300）、RGB 循环开启；队友那套默认同粗细、关节点 150、青色调。全部 28 项设置都可在菜单里改。
 
 **自己与他人分开显示**：你自己标记的敌人用一套颜色（默认品红），队友标记的敌人用另一套（默认青色），两套都各自带身体色、头部色、RGB 循环与速度、霓虹强度、粗细、关节点大小、呼吸灯。判断依据是游戏自己记录的标记者，所以队友重新标记同一个敌人时颜色会立刻跟着换。不想要队友的标记就把「队友的标记」关掉。
 

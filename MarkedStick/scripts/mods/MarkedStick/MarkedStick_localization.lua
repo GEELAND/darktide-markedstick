@@ -1,8 +1,8 @@
 return {
 	mod_name = {
-		en = "Stick Skeleton",
-		["zh-cn"] = "竹节虫骨架",
-		["zh-tw"] = "竹節蟲骨架",
+		en = "MarkedStick",
+		["zh-cn"] = "MarkedStick",
+		["zh-tw"] = "MarkedStick",
 	},
 	mod_description = {
 		en = "Draws a neon stick-figure skeleton on every elite or special your class ability marks: a bead-chain spine, neck, collarbones, arms and legs, with glowing joint dots on the head, torso, hands and feet -- the head in its own colour if you want it. Every width scales with the projected height of the whole figure, so the skeleton keeps its proportions at any range, and the light is built from the same four-band ladder a neon tube uses. Optional sine breathing and an RGB colour cycle, both starting from the colour you picked. Drawn in the UI layer, so no outline can ever cover it.",
@@ -115,9 +115,9 @@ return {
 		["zh-tw"] = "關節點大小（%%）",
 	},
 	stick_dot_size_description = {
-		en = "Dot diameter as a percentage of the line width. Whatever the slider says, the dot is never allowed below 180%% of the line width -- that floor is what keeps a distant joint readable as a dot instead of another bead. With the default thickness of 8 the floor is what you are seeing.",
-		["zh-cn"] = "关节点直径相对于线宽的百分比。无论滑块调到多低，圆点直径都不会小于线宽的 180%%——正是这条下限保证了远处的关节仍然读作一个点，而不是又一颗珠子。默认粗细 8 时，看到的正是这条下限。",
-		["zh-tw"] = "關節點直徑相對於線寬的百分比。無論滑塊調到多低，圓點直徑都不會小於線寬的 180%%——正是這條下限保證了遠處的關節仍然讀作一個點，而不是又一顆珠子。預設粗細 8 時，看到的正是這條下限。",
+		en = "Dot diameter as a percentage of the line width. Whatever the slider says, the dot is never allowed below 180 percent of the line width -- that floor is what keeps a distant joint readable as a dot instead of another bead. The default of 200 puts the joints clearly above that floor.",
+		["zh-cn"] = "关节点直径相对于线宽的百分比。无论滑块调到多低，圆点直径都不会小于线宽的 180%%——正是这条下限保证了远处的关节仍然读作一个点，而不是又一颗珠子。默认 200 已经高于这条下限。",
+		["zh-tw"] = "關節點直徑相對於線寬的百分比。無論滑塊調到多低，圓點直徑都不會小於線寬的 180%%——正是這條下限保證了遠處的關節仍然讀作一個點，而不是又一顆珠子。預設 200 已經高於這條下限。",
 	},
 	stick_density_title = {
 		en = "Beads per segment",
@@ -125,9 +125,9 @@ return {
 		["zh-tw"] = "每段珠子數",
 	},
 	stick_density_description = {
-		en = "Upper limit on how many beads one skeleton segment may use. A segment gets as many as fit at the current bead size, so the ceiling bites wherever there is room left to fill: hard at point-blank range, and still on the long segments (spine, thighs) at mid range. Lower it to thin the cord, or to save performance on a weak machine.",
-		["zh-cn"] = "单条骨架线段上最多放多少颗珠子。每段实际会放到“当前珠径下装得下”的数量，所以只要还有空间，上限就会起作用：贴脸时最明显，中等距离上长线段（脊椎、大腿）也照样吃得到。调低会让线更细，也能省性能。",
-		["zh-tw"] = "單條骨架線段上最多放多少顆珠子。每段實際會放到「目前珠徑下裝得下」的數量，所以只要還有空間，上限就會起作用：貼臉時最明顯，中等距離上長線段（脊椎、大腿）也照樣吃得到。調低會讓線更細，也能省效能。",
+		en = "Upper limit on how many beads one skeleton segment may use. A segment gets as many as fit at the current bead size, so this only bites when a segment is long on screen -- i.e. up close. At mid and long range every segment is already full well below 14, which is why raising it there changes nothing. Lower it to thin the cord, or to save performance on a weak machine.",
+		["zh-cn"] = "单条骨架线段上最多放多少颗珠子。每段只放到“当前珠径下装得下”的数量，所以只有在**近距离、线段在屏幕上够长**时才会用到 14 以上；中远距离各段早就放满了，再往上调不会有变化。调低会让线更细，也能省性能。",
+		["zh-tw"] = "單條骨架線段上最多放多少顆珠子。每段只放到「目前珠徑下裝得下」的數量，所以只有在**近距離、線段在螢幕上夠長**時才會用到 14 以上；中遠距離各段早就放滿了，再往上調不會有變化。調低會讓線更細，也能省效能。",
 	},
 	stick_show_head_title = {
 		en = "Head and neck",
@@ -265,9 +265,9 @@ return {
 		["zh-tw"] = "隊友的線條粗細",
 	},
 	stick_other_thickness_description = {
-		en = "Line thickness for teammates' marks. Thinner than your own by default, so your own mark stays the louder of the two.",
-		["zh-cn"] = "队友标记的线条粗细。默认比你自己的细一点，让你自己的标记更醒目。",
-		["zh-tw"] = "隊友標記的線條粗細。預設比你自己的細一點，讓你自己標記更醒目。",
+		en = "Line thickness for teammates' marks. Same weight as your own by default; lower it if you want your own mark to stand out more.",
+		["zh-cn"] = "队友标记的线条粗细。默认与你自己的相同；想让自己的标记更醒目就往下调。",
+		["zh-tw"] = "隊友標記的線條粗細。預設與你自己的相同；想讓自己的標記更醒目就往下調。",
 	},
 	stick_other_glow_title = {
 		en = "Teammates' glow",
@@ -285,8 +285,8 @@ return {
 		["zh-tw"] = "隊友的關節點大小",
 	},
 	stick_other_dot_size_description = {
-		en = "Joint dot size on teammates' marks, as a share of their line width. Below 180 the joints stop reading as dots, so that is the floor.",
-		["zh-cn"] = "队友标记的关节点大小，按其线宽的比例计算。低于 180 关节点就不再像点，所以那是下限。",
-		["zh-tw"] = "隊友標記的關節點大小，按其線寬的比例計算。低於 180 關節點就不再像點，所以那是下限。",
+		en = "Joint dot size on teammates' marks, as a share of their line width. Below 180 the joints stop reading as dots, so that is the floor. The default of 150 sits on that floor, i.e. the smallest a joint can be and still read as one.",
+		["zh-cn"] = "队友标记的关节点大小，按其线宽的比例计算。低于 180 关节点就不再像点，所以那是下限。默认 150 就停在这条下限上，也就是关节还能读作一个点的最小值。",
+		["zh-tw"] = "隊友標記的關節點大小，按其線寬的比例計算。低於 180 關節點就不再像點，所以那是下限。預設 150 就停在這個下限上，也就是關節還能讀作一個點的最小值。",
 	},
 }
