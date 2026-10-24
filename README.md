@@ -14,7 +14,7 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 ## Install
 
 1. Install DMF.
-2. Unzip `MarkedStick_v1.1.0.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
+2. Unzip `MarkedStick_v1.2.0.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
 3. Enable **Stick Skeleton** in the in-game mod list.
 
 **The zip must be unzipped.** Dropping the archive into `mods` does nothing -- the framework only scans `.mod` files, and a zipped mod simply never appears in the list.
@@ -27,7 +27,8 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 - **Four-band neon**: a near-white core plus three halos at 252 / 158 / 66 / 28 alpha, each wider than the last. A single halo band is a hard edge; four are a falloff.
 - **Distance** in metres under the skeleton.
 - **Optional motion**: a sine breath (never a blink) and an RGB colour cycle, both starting from the colour you picked. The head can carry its own colour.
-- **Your marks and your teammates'**, as two complete colour sets. The split comes from the game's own tag record (who applied the tag), so it is exact and it follows an enemy the moment somebody re-tags it.
+- **Your marks and your teammates'**, as two complete colour sets. The split comes from the game's own tag record (who applied the tag). An enemy you marked stays yours even if a teammate re-tags it -- the colour never changes under your hands -- while an enemy that was only theirs turns yours the moment you tag it.
+- **Keystone marks reach trash too.** The psyker keystone also lands on scabs and dregs, and those cannot be tagged by hand, so they used to be filtered out entirely. A keystone mark now draws a skeleton whatever the breed; horde bodies you tag by hand are still skipped.
 
 Range never takes the lines away. The chains and the joint dots are drawn at every distance; what recedes is the glow, which dims towards a floor so a far target is a thin neon line instead of six disconnected dots.
 
@@ -83,6 +84,8 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 **默认外观**（1.1.0 定版）：粗细 8、霓虹强度 50、关节点 200、每段珠子 24、呼吸开启（强度 40、速度 300）、RGB 循环开启；队友那套默认同粗细、关节点 150、青色调。全部 28 项设置都可在菜单里改。
 
-**自己与他人分开显示**：你自己标记的敌人用一套颜色（默认品红），队友标记的敌人用另一套（默认青色），两套都各自带身体色、头部色、RGB 循环与速度、霓虹强度、粗细、关节点大小、呼吸灯。判断依据是游戏自己记录的标记者，所以队友重新标记同一个敌人时颜色会立刻跟着换。不想要队友的标记就把「队友的标记」关掉。
+**自己与他人分开显示**：你自己标记的敌人用一套颜色（默认品红），队友标记的敌人用另一套（默认青色），两套都各自带身体色、头部色、RGB 循环与速度、霓虹强度、粗细、关节点大小、呼吸灯。判断依据是游戏自己记录的标记者。**你标记的敌人即使之后被队友重新标记，也保持你的颜色**（引擎里一个目标只持一个标记，队友覆盖后 tag 归他，但骨架不会在你眼前换主人）；反过来，本来只有队友标记的敌人，你一标记就变成你的。不想要队友的标记就把「队友的标记」关掉。
+
+**基石天赋标记的小兵也会画**：灵能「扰动命运」这类基石会标记血痂/渣滓小兵，而这些敌人无法手动标记，旧版会把它们整个过滤掉。现在只要带的是基石标记，不论兵种都画骨架；**你自己手动标记的小兵仍然不画**，免得满屏骨架。
 
 **命令**：`/stick_diag` 看状态；`/stick_rig` 导出被标记敌人身上真实的骨骼名（长输出，分批查看）——某个肢体没画出来就把这个输出附在反馈里；`/stick_glow` 打印上一帧霓虹光晕的实际数值（设置值、投影比例、芯与三层光晕的宽度、亮度增益），霓虹强度看着不对就附它；`/stick_own` 打印游戏认定的本地玩家、你名下有多少个标记 id、以及每个在场标记的 tag id——用来查“我的标记为什么显示成队友颜色”。

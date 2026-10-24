@@ -2003,17 +2003,49 @@ local function owner_tests()
 
 	SETTINGS.stick_other_rgb = false
 
-	-- Re-tagging while the skeleton is up: ownership is refreshed every frame,
-	-- so the recolour is immediate rather than on the next scan.
+	-- Mine is sticky. The game moves a target's single tag to whoever re-tags
+	-- it, so a teammate CAN take an enemy I marked off me in the engine's books
+	-- -- but the skeleton must not change owner in front of the player who
+	-- marked it. This is the reported bug, pinned here.
 	tag_by(ALLY, mine)
 	mod.update(0.3)
-	check(same_colour(body_rgb(draw(mine, 0)), SETTINGS.stick_other_color),
-		"a teammate re-tagging my enemy repaints it with the teammates' set")
-
-	tag_by(ME, mine)
-	mod.update(0.3)
 	check(same_colour(body_rgb(draw(mine, 0)), SETTINGS.stick_color),
-		"and taking it back paints it with mine again")
+		"a teammate re-tagging my enemy does NOT repaint it -- mine stays mine")
+
+	-- The other direction still works: an enemy that was theirs all along turns
+	-- mine the moment I tag it, so the stickiness is one-way and not "mine
+	-- always wins".
+	local late = mkunit("late_mark", 16, ELITE)
+	outline_system._unit_extension_data[late] = { outlines = { { name = "smart_tagged_enemy" } } }
+	tag_by(ALLY, late)
+	mod.update(0.3)
+
+	check(same_colour(body_rgb(draw(late, 0)), SETTINGS.stick_other_color),
+		"an enemy tagged only by a teammate is painted with their set")
+
+	tag_by(ME, late)
+	mod.update(0.3)
+	check(same_colour(body_rgb(draw(late, 0)), SETTINGS.stick_color),
+		"and becomes mine the moment I tag it")
+
+	-- Keystone marks reach trash that cannot be tagged by hand (a scab, a
+	-- dreg), so the elite/special filter must not eat them.
+	local mook = mkunit("keystone_mook", 18, HORDE)
+	outline_system._unit_extension_data[mook] = { outlines = { { name = "psyker_marked_target" } } }
+	mod.update(0.3)
+
+	check(has_marker(mook), "a keystone-marked trash mob gets a skeleton")
+	check(same_colour(body_rgb(draw(mook, 0)), SETTINGS.stick_color),
+		"in my own colours -- a keystone mark has no tag, so it is mine")
+
+	-- The same body with a manual tag is still filtered out: tagging trash by
+	-- hand must not turn the HUD into a horde of skeletons.
+	local tagged_mook = mkunit("tagged_mook", 20, HORDE)
+	outline_system._unit_extension_data[tagged_mook] = { outlines = { { name = "smart_tagged_enemy" } } }
+	tag_by(ME, tagged_mook)
+	mod.update(0.3)
+
+	check(not has_marker(tagged_mook), "a hand-tagged horde body is still skipped")
 
 	-- Switching the teammates' set off mid-fight has to remove what is already
 	-- on screen, not wait for the affected enemy to be re-tagged.

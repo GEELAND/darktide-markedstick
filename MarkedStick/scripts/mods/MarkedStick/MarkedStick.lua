@@ -10,19 +10,31 @@
 	WHAT THIS FILE DOES
 	  1. registers a marker template with the engine's HudElementWorldMarkers;
 	  2. watches the outline system for the class-mark outline names;
-	  3. keeps only elites and specials -- a marked horde body gets no skeleton;
+	  3. keeps elites and specials -- a marked horde body gets no skeleton, with
+	     one exception: the class keystones mark trash that cannot be tagged by
+	     hand at all, and those are drawn (see KEYSTONE_MARKS);
 	  4. asks the game's own smart tag who made the mark, so an enemy a teammate
 	     tagged can be told apart from one the player tagged;
 	  5. asks the engine to draw a skeleton on each kept unit;
 	  6. takes the skeleton back the moment the unit stops qualifying.
 
 	WHY STEP 4 IS A FACT AND NOT A GUESS
-	  A marked enemy carries a smart tag, and a smart tag stores the unit and the
-	  Player that created it. A target holds at most one tag at a time, so the
-	  two cases are exclusive: an enemy is either the player's mark or somebody
-	  else's, never both. The class keystones that mark without a tag
+	  A marked enemy carries a smart tag, and the game records which player made
+	  it: the tag stores tagger_unit / tagger_player, and the tagger's own
+	  extension lists the tag ids it created (owned_tag_ids). The scan compares
+	  ids, which is integer equality and cannot be fooled by a respawn or a
+	  stale player_unit. A target holds at most one tag at a time, so the two
+	  cases are exclusive: an enemy is either the player's mark or somebody
+	  else's. The class keystones that mark without a tag
 	  (psyker_marked_target and friends) are personal by construction, so "no
 	  tag" counts as the player's own.
+
+	MINE IS STICKY
+	  Because a target holds only one tag, a teammate re-tagging the player's
+	  enemy takes that tag for themselves. The skeleton still must not change
+	  owner under the player's eyes, so the verdict is one-way while a marker
+	  lives: once mine, always mine. Ship it the other way and the mark the
+	  player just made turns blue a moment later, which reads as a fault.
 
 	WHY STEP 5 EXISTS, AND WHY IT IS PER-FRAME
 	  A world marker is owned by the engine, not by us. Dropping our own
@@ -71,6 +83,16 @@ local GAME_MARK_NAMES = {
 	smart_tagged_enemy_passive = true,
 	psyker_marked_target = true,
 	adamant_smart_tag = true,
+	adamant_mark_target = true,
+}
+
+-- The keystone marks. These are exempt from the elite/special filter below,
+-- because they are the only way their targets can be marked at all: the psyker
+-- keystone also lands on scabs and dregs, and a scab cannot be tagged by hand
+-- (the game refuses), so filtering those out means the player never sees the
+-- mark their own talent put there.
+local KEYSTONE_MARKS = {
+	psyker_marked_target = true,
 	adamant_mark_target = true,
 }
 
@@ -337,7 +359,13 @@ end
 -- When the breed lookup fails we FAIL OPEN. A HUD that draws nothing is harder
 -- to diagnose than one that draws too much, and `/stick_diag` reports the
 -- count so the difference is visible instead of silent.
-local function is_target(unit)
+local function is_target(unit, mark_name)
+	-- Keystone marks go through: their targets include trash a player cannot
+	-- tag by hand, and the whole point is to see the mark the talent applied.
+	if mark_name and KEYSTONE_MARKS[mark_name] then
+		return true
+	end
+
 	local breed = breed_of(unit)
 
 	if not breed then
@@ -482,14 +510,25 @@ local function refresh_owner(unit)
 		return
 	end
 
-	local own = own_mark(unit, record.own)
-
-	if own == record.own then
+	-- MINE IS STICKY, and this is deliberate.
+	--
+	-- A target unit holds exactly one tag, so when a teammate re-tags an enemy
+	-- the game moves the tag to them and the record stops pointing at us. From
+	-- the player's chair that enemy is still the one they marked, and a skeleton
+	-- that changes owner mid-fight reads as a fault, so the verdict only ever
+	-- moves in one direction while the marker is alive: an enemy never stops
+	-- being mine. A body that was somebody else's all along can still become
+	-- mine the moment the player tags it.
+	if record.own then
 		return
 	end
 
-	record.own = own
-	StickMarker.set_own(unit, own)
+	if tag_owner(unit) ~= true then
+		return
+	end
+
+	record.own = true
+	StickMarker.set_own(unit, true)
 end
 
 -- Everything that has to be true for a skeleton to stay on screen.
@@ -600,7 +639,7 @@ local function tick()
 			local mark_name = is_marked(ext)
 
 			if mark_name and unit_alive(unit) and health_alive(unit) then
-				if is_target(unit) then
+				if is_target(unit, mark_name) then
 					local own = own_mark(unit)
 
 					if own or others_enabled() then

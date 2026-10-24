@@ -3,6 +3,19 @@
 The public version numbering starts here. Earlier internal iteration numbers
 are archived under `build/dev/` and never shipped.
 
+## 1.2.0
+
+- Your marks stay yours. A target holds exactly one tag, so a teammate who
+  re-tags the enemy you marked takes that tag in the game's own books -- the
+  skeleton used to follow the tag and turn into their colour. Ownership is now
+  one-way while a marker lives: once yours, always yours. It still works in the
+  other direction, so an enemy only a teammate had marked turns yours the moment
+  you tag it.
+- Keystone marks now reach trash. The psyker keystone also marks scabs and
+  dregs, which cannot be tagged by hand at all, so the elite/special filter hid
+  every one of them. A keystone outline now draws a skeleton whatever the breed.
+  Horde bodies you tag by hand are still skipped, so the screen does not fill up.
+
 ## 1.1.0
 
 Public numbering moves to 1.x, matching the release line the mod was published

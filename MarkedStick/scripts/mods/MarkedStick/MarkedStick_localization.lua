@@ -5,9 +5,9 @@ return {
 		["zh-tw"] = "MarkedStick",
 	},
 	mod_description = {
-		en = "Draws a neon stick-figure skeleton on every elite or special your class ability marks: a bead-chain spine, neck, collarbones, arms and legs, with glowing joint dots on the head, torso, hands and feet -- the head in its own colour if you want it. Every width scales with the projected height of the whole figure, so the skeleton keeps its proportions at any range, and the light is built from the same four-band ladder a neon tube uses. Optional sine breathing and an RGB colour cycle, both starting from the colour you picked. Drawn in the UI layer, so no outline can ever cover it.",
-		["zh-cn"] = "给被职业技能标记的精英与专家画一副霓虹竹节虫骨架：躯干、头颈、锁骨、双臂、双腿全部由小珠子串成，头、躯干、双手、双脚上各放一个明显的发光点——头部可以单独配色。所有粗细随整具骨架的投影高度同步缩放，任何距离都保持比例；光感来自霓虹灯管同款四层光晕阶梯。可选项：正弦呼吸灯与 RGB 循环，起点都是你选的颜色。画在 UI 层，任何轮廓都盖不住。",
-		["zh-tw"] = "給被職業技能標記的精英與專家畫一副霓虹竹節蟲骨架：軀幹、頭頸、鎖骨、雙臂、雙腿全部由小珠子串成，頭、軀幹、雙手、雙腳上各放一個明顯的發光點——頭部可以單獨配色。所有粗細隨整具骨架的投影高度同步縮放，任何距離都保持比例；光感來自霓虹燈管同款四層光暈階梯。可選項：正弦呼吸燈與 RGB 循環，起點都是你選的顏色。畫在 UI 層，任何輪廓都蓋不住。",
+		en = "Draws a neon stick-figure skeleton on the enemies your marks land on: elites and specials, plus the trash a keystone mark reaches (those cannot be tagged by hand). A bead-chain spine, neck, collarbones, arms and legs, with glowing joint dots on the head, torso, hands and feet -- the head in its own colour if you want it. Every width scales with the projected height of the whole figure, so the skeleton keeps its proportions at any range, and the light is built from the same four-band ladder a neon tube uses. Optional sine breathing and an RGB colour cycle, both starting from the colour you picked. Your marks keep your colours even if a teammate re-tags the same enemy. Drawn in the UI layer, so no outline can ever cover it.",
+		["zh-cn"] = "给被标记的敌人画一副霓虹竹节虫骨架：精英与专家，以及被基石天赋标记到的小兵（这类敌人无法手动标记）。躯干、头颈、锁骨、双臂、双腿全部由小珠子串成，头、躯干、双手、双脚上各放一个明显的发光点——头部可以单独配色。所有粗细随整具骨架的投影高度同步缩放，任何距离都保持比例；光感来自霓虹灯管同款四层光晕阶梯。可选项：正弦呼吸灯与 RGB 循环，起点都是你选的颜色。你标记的敌人即使之后被队友重新标记，也保持你的颜色。画在 UI 层，任何轮廓都盖不住。",
+		["zh-tw"] = "給被標記的敵人畫一副霓虹竹節蟲骨架：精英與專家，以及被基石天賦標記到的小兵（這類敵人無法手動標記）。軀幹、頭頸、鎖骨、雙臂、雙腿全部由小珠子串成，頭、軀幹、雙手、雙腳上各放一個明顯的發光點——頭部可以單獨配色。所有粗細隨整具骨架的投影高度同步縮放，任何距離都保持比例；光感來自霓虹燈管同款四層光暈階梯。可選項：正弦呼吸燈與 RGB 循環，起點都是你選的顏色。你標記的敵人即使之後被隊友重新標記，也保持你的顏色。畫在 UI 層，任何輪廓都蓋不住。",
 	},
 	stick_enabled_title = {
 		en = "Enable stick skeleton",

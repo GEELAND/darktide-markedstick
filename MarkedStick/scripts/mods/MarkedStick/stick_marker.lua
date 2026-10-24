@@ -66,13 +66,15 @@
 	  into an unreadable speck.
 
 	TWO COLOUR SETS: YOUR MARK AND SOMEBODY ELSE'S
-	  The scan asks the game's own entity tag for the tagger (SmartTag keeps
-	  `tagger_unit` / `tagger_player`), so the split is a fact rather than a
-	  guess. A target unit holds at most one tag at a time, which makes the
-	  two sets mutually exclusive. Everything colour-related -- body, head,
-	  cycle, glow, thickness, dot size, breath -- is read once per side; the
-	  group switches, the density and the distance readout stay global,
-	  because they describe the figure and not who tagged it.
+	  The scan compares the enemy's tag id against the ids the game records on
+	  the player's own tag extension, so the split is a fact rather than a
+	  guess. A target unit holds at most one tag at a time, and the ownership
+	  verdict is one-way while a marker lives: an enemy the player marked stays
+	  theirs even if a teammate re-tags it (see MarkedStick.lua). Everything
+	  colour-related -- body, head, cycle, glow, thickness, dot size, breath --
+	  is read once per side; the group switches, the density and the distance
+	  readout stay global, because they describe the figure and not who tagged
+	  it.
 
 	WHAT IS DELIBERATELY NOT HERE
 	  * no line-of-sight test -- a marked enemy behind a wall still has to
