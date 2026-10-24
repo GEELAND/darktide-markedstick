@@ -3,6 +3,21 @@
 The public version numbering starts here. Earlier internal iteration numbers
 are archived under `build/dev/` and never shipped.
 
+## 0.2.0
+
+- The skeleton no longer loses its lines with range. The bead chains and the
+  joint dots are drawn at every distance; what recedes is the glow, which now
+  fades towards a floor instead of the chains fading out entirely. A marked
+  enemy far away reads as a thin neon line rather than six disconnected dots.
+- Marks are split by who made them: enemies you tagged and enemies a teammate
+  tagged carry separate, complete colour sets -- body colour, head colour,
+  colour cycle plus speed, glow, thickness, joint size and breathing. A
+  teammate can only be told apart from you by the game's own tag record, so the
+  split follows the tagger and updates the instant an enemy is re-tagged.
+- New switch: "Teammates' marks", on by default. Off draws your own marks only.
+- `/stick_diag` now reports `mine / theirs / hidden`.
+- 28 settings.
+
 ## 0.1.0
 
 First public release.

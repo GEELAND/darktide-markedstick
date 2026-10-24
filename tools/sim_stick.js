@@ -84,6 +84,17 @@ SETTINGS = {
 	stick_thickness = 8,
 	stick_glow = 50,
 	stick_dot_size = 120,
+	stick_other_enabled = true,
+	stick_other_color = { 255, 60, 220, 255 },
+	stick_other_head_color = { 255, 60, 220, 255 },
+	stick_other_rgb = true,
+	stick_other_rgb_speed = 100,
+	stick_other_breath = true,
+	stick_other_breath_depth = 40,
+	stick_other_breath_speed = 300,
+	stick_other_thickness = 6,
+	stick_other_glow = 50,
+	stick_other_dot_size = 120,
 	stick_density = 14,
 	stick_show_head = true,
 	stick_show_torso = true,
@@ -273,6 +284,41 @@ local F = mkunit("F", 8, nil)          -- marked, but no breed readable
 local G = mkunit("G", 12, { name = "chaos_ogryn_bulgrym", tags = { elite = true, ogryn = true }, base_height = 2.6 })
 
 local outline_system = { _unit_extension_data = {} }
+
+-- The game's smart tag bookkeeping, in the shape SmartTagSystem exposes it: a
+-- target unit carries at most one tag, and the tag knows who made it through
+-- tagger_player / tagger_unit. A nil entry means "no smart tag at all", which
+-- is the class-keystone case.
+local smart_tag_system = { _tags = {} }
+
+function smart_tag_system.unit_tag(self, unit)
+	return self._tags[unit]
+end
+
+function smart_tag_system.unit_tag_id(self, unit)
+	return self._tags[unit] and 1 or nil
+end
+
+local me_unit = { name = "me" }
+local ME = { player_unit = me_unit }
+local ALLY = { player_unit = { name = "ally" } }
+
+local function new_tag(player)
+	return {
+		__player = player,
+		__unit = player and player.player_unit or nil,
+		tagger_player = function(self) return self.__player end,
+		tagger_unit = function(self) return self.__unit end,
+	}
+end
+
+local function tag_by(player, unit)
+	smart_tag_system._tags[unit] = new_tag(player)
+end
+
+local function untag(unit)
+	smart_tag_system._tags[unit] = nil
+end
 local hud_element = {
 	_parent = { player_camera = function(self) return camera end },
 	_marker_templates = {},
@@ -294,10 +340,21 @@ local next_marker_id = 0
 local removed_ids = {}
 
 Managers = {
+	player = {
+		local_player = function(self) return ME end,
+	},
 	state = {
 		extension = {
-			has_system = function(self, n) return n == "outline_system" end,
-			system = function(self, n) return outline_system end,
+			has_system = function(self, n)
+				return n == "outline_system" or n == "smart_tag_system"
+			end,
+			system = function(self, n)
+				if n == "smart_tag_system" then
+					return smart_tag_system
+				end
+
+				return outline_system
+			end,
 		},
 		camera = {
 			camera = function(self, name) return camera end,
@@ -919,24 +976,30 @@ local function ladder_tests()
 
 	local near = frame(mkunit("l_near", 5, ELITE), 5)
 	local mid = frame(mkunit("l_mid", 22, ELITE), 22)
-	local far = frame(mkunit("l_far", 30, ELITE), 30)
-	local vfar = frame(mkunit("l_vfar", 50, ELITE), 50)
-
-	local r_mid = ratio_of(mkunit("l_mid2", 22, ELITE))
-	local r_far = ratio_of(mkunit("l_far2", 30, ELITE))
+	local far = frame(mkunit("l_far", 40, ELITE), 40)
+	local vfar = frame(mkunit("l_vfar", 60, ELITE), 60)
 
 	check(near.style.b2_1_c.visible and near.style.b2_1_c.color[1] == 252,
 		"at close range the beads burn at full strength (252)")
-	check(math.abs(mid.style.b2_1_c.color[1] - math.floor(252 * ramp(r_mid, 0.20, 0.30))) <= 1,
-		"mid-range the beads sit exactly on the linear fade (alpha " .. mid.style.b2_1_c.color[1] .. ")")
-	check(visible_beads(far) == 0,
-		"past ratio 0.20 no bead is left on screen")
-	check(far.style.d_head_c.visible and far.style.d_head_c.color[1] == 252,
-		"but the head dot never fades -- it is the floor")
-	check(math.abs(far.style.d_handL_c.color[1] - math.floor(252 * ramp(r_far, 0.12, 0.20))) <= 1,
-		"and the limb dots ride their own, later fade (alpha " .. far.style.d_handL_c.color[1] .. ")")
-	check(not vfar.style.d_handL_c.visible and vfar.style.d_head_c.visible,
-		"past ratio 0.12 only the two anchor dots are left")
+	check(math.abs(mid.style.b2_1_c.color[1] - 252) <= 1,
+		"mid-range the beads keep full strength -- they no longer fade (alpha " .. mid.style.b2_1_c.color[1] .. ")")
+	check(visible_beads(far) > 0,
+		"past the old 0.20 cut the chains are still on screen (" .. visible_beads(far) .. " beads)")
+	check(math.abs(far.style.b2_1_c.color[1] - 252) <= 1,
+		"and still at full strength at 40 m")
+	check(visible_beads(vfar) > 0,
+		"a 60 m target keeps its beads as well (" .. visible_beads(vfar) .. " beads)")
+	check(vfar.style.d_head_c.color[1] == 252 and vfar.style.d_handL_c.color[1] == 252,
+		"the head and limb dots never fade either")
+	-- The distance takes the glow, not the lines: at 60 m the widest halo band
+	-- must be a fraction of its 10 m strength, but not gone (a floor keeps it
+	-- reading as neon rather than as a flat wireframe).
+	check(near.style.b2_1_o.color[1] > vfar.style.b2_1_o.color[1],
+		"the halo is what recedes (" .. near.style.b2_1_o.color[1] .. " -> " .. vfar.style.b2_1_o.color[1] .. ")")
+	check(vfar.style.b2_1_o.color[1] >= 3,
+		"and it keeps a visible floor instead of vanishing (" .. vfar.style.b2_1_o.color[1] .. ")")
+	check(vfar.style.b2_1_c.size[1] <= 1.6,
+		"the far bead is a hairline, so the figure stays a line drawing (" .. string.format("%.2f", vfar.style.b2_1_c.size[1]) .. " px)")
 
 	-- A skeleton too poor to read as a figure degrades to its two anchors
 	-- instead of drawing a crooked matchstick.
@@ -1111,7 +1174,7 @@ local function residue_tests()
 
 	tpl.update_function(hud_element, nil, def, { unit = far_u, distance = 50 }, tpl, 0.016, 0)
 
-	local dirty, stale, biggest = 0, 0, 0
+	local dirty, stale_beads, biggest = 0, 0, 0
 
 	for i = 1, #def.passes do
 		local st = def.passes[i].style
@@ -1131,17 +1194,23 @@ local function residue_tests()
 				biggest = st.size[1]
 			end
 
+			-- A bead that survived from the 3 m frame would still carry that
+			-- frame's 9.5 px core. At 50 m the core is a hairline, so any bead
+			-- wider than the far frame's own core is residue.
 			local id = def.passes[i].style_id
 
-			if id and string.sub(id, 1, 1) == "b" then
-				stale = stale + 1
+			if id and string.sub(id, 1, 1) == "b" and st.size[1] > 2.5 then
+				stale_beads = stale_beads + 1
 			end
 		end
 	end
 
 	check(near_beads > 20, "at 3 m the chains are dense (" .. near_beads .. " beads)")
 	check(dirty == 0, "a distance jump empties every unused slot (" .. dirty .. " left dirty)")
-	check(stale == 0, "and no bead survives into the far frame (" .. stale .. " stale)")
+	check(stale_beads == 0,
+		"and no 3 m bead survives into the far frame at its old size (" .. stale_beads .. " stale)")
+	check(visible_beads(def) > 0,
+		"the far frame still draws its own chains (" .. visible_beads(def) .. " beads)")
 	-- At 50 m the only things left are the two anchor dots, and a dot's outer
 	-- band is 2.25 x its core (1.8 px at that range) = 4.05 px.
 	check(biggest <= 4.1, "the biggest thing left at 50 m is the anchor dot (" .. string.format("%.2f", biggest) .. " px)")
@@ -1662,6 +1731,141 @@ end
 
 rig_probe_tests()
 
+-- E. whose mark is it ---------------------------------------------------------
+--
+-- The game records the tagger on every smart tag (tagger_unit / tagger_player),
+-- and a target unit holds at most one tag, so "mine" and "theirs" are mutually
+-- exclusive. What has to hold here:
+--   * a tag of mine paints my colour set, another player's paints theirs;
+--   * a mark with NO smart tag (the class keystone) counts as mine, because
+--     those marks are personal to whoever applied them;
+--   * re-tagging flips the colours of a skeleton that is already on screen;
+--   * switching the teammates' set off stops drawing them at all, while my own
+--     marks keep coming;
+--   * the two colour cycles are independent -- the side with its cycle off must
+--     not freeze the side that has it on.
+
+-- The middle band of a bead is the picked colour, untouched: the core is pushed
+-- towards white and the outer band is dimmed, so this is the one band that can
+-- be compared with a setting value directly.
+local function body_rgb(def)
+	return def.style.b2_1_m.color
+end
+
+local function same_colour(a, b)
+	return a[2] == b[2] and a[3] == b[3] and a[4] == b[4]
+end
+
+local function draw(unit, t)
+	local d = tpl.create_widget_defintion(tpl, "scene")
+
+	tpl.update_function(hud_element, nil, d, { unit = unit, distance = 10 }, tpl, 0.016, t or 0)
+
+	return d
+end
+
+local function owner_tests()
+	keep_only({})
+	smart_tag_system._tags = {}
+
+	SETTINGS.stick_rgb = false
+	SETTINGS.stick_other_rgb = false
+	SETTINGS.stick_breath = false
+	SETTINGS.stick_other_breath = false
+	SETTINGS.stick_other_enabled = true
+
+	local mine = mkunit("own_mark", 10, ELITE)
+	local theirs = mkunit("ally_mark", 12, ELITE)
+	local keystone = mkunit("key_mark", 14, ELITE)
+
+	outline_system._unit_extension_data[mine] = { outlines = { { name = "veteran_smart_tag" } } }
+	outline_system._unit_extension_data[theirs] = { outlines = { { name = "smart_tagged_enemy" } } }
+	outline_system._unit_extension_data[keystone] = { outlines = { { name = "psyker_marked_target" } } }
+
+	tag_by(ME, mine)
+	tag_by(ALLY, theirs)
+
+	local before = #created
+	mod.update(0.3)
+
+	check(#created - before == 3, "all three marks get a skeleton (" .. (#created - before) .. ")")
+	check(same_colour(body_rgb(draw(mine, 0)), SETTINGS.stick_color),
+		"my own tag is painted with my colour set")
+	check(same_colour(body_rgb(draw(theirs, 0)), SETTINGS.stick_other_color),
+		"a teammate's tag is painted with theirs")
+	check(same_colour(body_rgb(draw(keystone, 0)), SETTINGS.stick_color),
+		"a mark with no smart tag at all (the class keystone) counts as mine")
+
+	-- Independent cycles. With mine off and theirs on, the teammate's hue has to
+	-- drift, and my own colour has to sit still -- a shared origin would let the
+	-- switched-off side reset the running one every frame and freeze it.
+	SETTINGS.stick_other_rgb = true
+
+	local theirs_1 = body_rgb(draw(theirs, 0))
+	local theirs_2 = body_rgb(draw(theirs, 2.0))
+
+	check(not same_colour(theirs_1, theirs_2),
+		"the teammates' cycle runs while mine is switched off")
+
+	local mine_1 = body_rgb(draw(mine, 0))
+	local mine_2 = body_rgb(draw(mine, 2.0))
+
+	check(same_colour(mine_1, mine_2), "and my own marks hold their colour meanwhile")
+	check(same_colour(mine_1, SETTINGS.stick_color),
+		"a switch-off cycle leaves my picked colour exactly as picked")
+
+	SETTINGS.stick_other_rgb = false
+
+	-- Re-tagging while the skeleton is up: ownership is refreshed every frame,
+	-- so the recolour is immediate rather than on the next scan.
+	tag_by(ALLY, mine)
+	mod.update(0.3)
+	check(same_colour(body_rgb(draw(mine, 0)), SETTINGS.stick_other_color),
+		"a teammate re-tagging my enemy repaints it with the teammates' set")
+
+	tag_by(ME, mine)
+	mod.update(0.3)
+	check(same_colour(body_rgb(draw(mine, 0)), SETTINGS.stick_color),
+		"and taking it back paints it with mine again")
+
+	-- Teammates' marks switched off: only my own enemies get a skeleton, and the
+	-- diagnostics say how many were filtered instead of leaving it a mystery.
+	SETTINGS.stick_other_enabled = false
+	keep_only({})
+	smart_tag_system._tags = {}
+
+	outline_system._unit_extension_data[mine] = { outlines = { { name = "veteran_smart_tag" } } }
+	outline_system._unit_extension_data[theirs] = { outlines = { { name = "veteran_smart_tag" } } }
+
+	tag_by(ME, mine)
+	tag_by(ALLY, theirs)
+
+	before = #created
+	mod.update(0.3)
+
+	check(#created - before == 1,
+		"with teammates' marks off only my own enemy gets a skeleton (" .. (#created - before) .. ")")
+
+	echo_lines = {}
+	commands.stick_diag()
+
+	local diag = table.concat(echo_lines, " | ")
+
+	check(string.find(diag, "hidden=1", 1, true) ~= nil, "and the diag counts the one that was filtered")
+	check(string.find(diag, "mine=1", 1, true) ~= nil, "while still counting mine")
+
+	SETTINGS.stick_other_enabled = true
+	SETTINGS.stick_rgb = true
+	SETTINGS.stick_other_rgb = true
+	SETTINGS.stick_breath = true
+	SETTINGS.stick_other_breath = true
+
+	smart_tag_system._tags = {}
+	keep_only({})
+end
+
+owner_tests()
+
 OUT.summary = table.concat(OUT.checks, "\\n")
 OUT.echo = table.concat(echo_lines, " | ")
 RESULT = OUT
@@ -1915,6 +2119,17 @@ local expected = {
 	{ id = "stick_thickness",     type = "numeric",  default = 8,   range = { 1, 8 } },
 	{ id = "stick_glow",          type = "numeric",  default = 50,  range = { 0, 200 } },
 	{ id = "stick_dot_size",      type = "numeric",  default = 120, range = { 120, 300 } },
+	{ id = "stick_other_enabled", type = "checkbox", default = true },
+	{ id = "stick_other_color",   type = "color" },
+	{ id = "stick_other_head_color", type = "color" },
+	{ id = "stick_other_rgb",     type = "checkbox", default = true },
+	{ id = "stick_other_rgb_speed", type = "numeric", default = 100, range = { 10, 300 } },
+	{ id = "stick_other_breath",  type = "checkbox", default = true },
+	{ id = "stick_other_breath_depth", type = "numeric", default = 40, range = { 0, 80 } },
+	{ id = "stick_other_breath_speed", type = "numeric", default = 300, range = { 10, 300 } },
+	{ id = "stick_other_thickness", type = "numeric", default = 6,  range = { 1, 8 } },
+	{ id = "stick_other_glow",    type = "numeric",  default = 50,  range = { 0, 200 } },
+	{ id = "stick_other_dot_size", type = "numeric", default = 120, range = { 120, 300 } },
 	{ id = "stick_density",       type = "numeric",  default = 14,  range = { 4, 14 } },
 	{ id = "stick_show_head",     type = "checkbox", default = true },
 	{ id = "stick_show_torso",    type = "checkbox", default = true },

@@ -139,6 +139,110 @@ return {
 				step_size_value = 10,
 			},
 			{
+			-- ------------------------------------------------------------------
+			-- Marks made by OTHER players. Same list as the block above, behind
+			-- `stick_other_`, so the two sets are complete rather than a token
+			-- colour swap. Default cyan and a slightly thinner line: an
+			-- untouched install already tells the two apart at a glance, and
+			-- your own mark stays the louder of the pair.
+			-- ------------------------------------------------------------------
+			setting_id = "stick_other_enabled",
+			type = "checkbox",
+			title = "stick_other_enabled_title",
+			tooltip = "stick_other_enabled_description",
+			default_value = true,
+			},
+			{
+			setting_id = "stick_other_color",
+			type = "color",
+			title = "stick_other_color_title",
+			tooltip = "stick_other_color_description",
+			default_value = { 255, 60, 220, 255 },
+			has_alpha = false,
+			},
+			{
+			setting_id = "stick_other_head_color",
+			type = "color",
+			title = "stick_other_head_color_title",
+			tooltip = "stick_other_head_color_description",
+			default_value = { 255, 60, 220, 255 },
+			has_alpha = false,
+			},
+			{
+			setting_id = "stick_other_rgb",
+			type = "checkbox",
+			title = "stick_other_rgb_title",
+			tooltip = "stick_other_rgb_description",
+			default_value = true,
+			},
+			{
+			setting_id = "stick_other_rgb_speed",
+			type = "numeric",
+			title = "stick_other_rgb_speed_title",
+			tooltip = "stick_other_rgb_speed_description",
+			default_value = 100,
+				range = { 10, 300 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
+			setting_id = "stick_other_breath",
+			type = "checkbox",
+			title = "stick_other_breath_title",
+			tooltip = "stick_other_breath_description",
+			default_value = true,
+			},
+			{
+			setting_id = "stick_other_breath_depth",
+			type = "numeric",
+			title = "stick_other_breath_depth_title",
+			tooltip = "stick_other_breath_depth_description",
+			default_value = 40,
+				range = { 0, 80 },
+				decimals_number = 0,
+				step_size_value = 5,
+			},
+			{
+			setting_id = "stick_other_breath_speed",
+			type = "numeric",
+			title = "stick_other_breath_speed_title",
+			tooltip = "stick_other_breath_speed_description",
+			default_value = 300,
+				range = { 10, 300 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
+			setting_id = "stick_other_thickness",
+			type = "numeric",
+			title = "stick_other_thickness_title",
+			tooltip = "stick_other_thickness_description",
+			default_value = 6,
+				range = { 1, 8 },
+				decimals_number = 0,
+				step_size_value = 1,
+			},
+			{
+			setting_id = "stick_other_glow",
+			type = "numeric",
+			title = "stick_other_glow_title",
+			tooltip = "stick_other_glow_description",
+			default_value = 50,
+				range = { 0, 200 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
+			setting_id = "stick_other_dot_size",
+			type = "numeric",
+			title = "stick_other_dot_size_title",
+			tooltip = "stick_other_dot_size_description",
+			default_value = 120,
+				range = { 120, 300 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
 				-- Beads per segment, and the only performance lever in the mod.
 				-- Four marked enemies at the default is the design case, so the
 				-- default spends the full budget.

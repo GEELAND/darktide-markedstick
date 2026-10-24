@@ -179,4 +179,114 @@ return {
 		["zh-cn"] = "在骨架下方显示以米为单位的距离。",
 		["zh-tw"] = "在骨架下方顯示以米為單位的距離。",
 	},
+	stick_other_enabled_title = {
+		en = "Teammates' marks",
+		["zh-cn"] = "队友的标记",
+		["zh-tw"] = "隊友的標記",
+	},
+	stick_other_enabled_description = {
+		en = "Also draw a skeleton on enemies a teammate tagged. Off leaves only the enemies you tagged yourself.",
+		["zh-cn"] = "队友标记的敌人也画骨架。关掉后只显示你自己标记的敌人。",
+		["zh-tw"] = "隊友標記的敵人也畫骨架。關掉後只顯示你自己標記的敵人。",
+	},
+	stick_other_color_title = {
+		en = "Teammates' colour",
+		["zh-cn"] = "队友的颜色",
+		["zh-tw"] = "隊友的顏色",
+	},
+	stick_other_color_description = {
+		en = "The gas colour for enemies a teammate tagged. It is a separate set from your own colour, so the two are never confused for each other.",
+		["zh-cn"] = "队友标记的敌人所用的颜色。它和你自己的颜色是两套独立的设置，两者不会混淆。",
+		["zh-tw"] = "隊友標記的敵人所用的顏色。它和你自己的顏色是兩套獨立設定，兩者不會混淆。",
+	},
+	stick_other_head_color_title = {
+		en = "Teammates' head colour",
+		["zh-cn"] = "队友的头部颜色",
+		["zh-tw"] = "隊友的頭部顏色",
+	},
+	stick_other_head_color_description = {
+		en = "The colour of the neck segment and the head dot on a teammate's mark. Defaults to their body colour.",
+		["zh-cn"] = "队友标记的敌人，其头颈段与头部关节点的颜色。默认与他们的身体颜色相同。",
+		["zh-tw"] = "隊友標記的敵人，其頭頸段與頭部關節點的顏色。預設與他們的身體顏色相同。",
+	},
+	stick_other_rgb_title = {
+		en = "Teammates' colour cycle",
+		["zh-cn"] = "队友的 RGB 循环",
+		["zh-tw"] = "隊友的 RGB 循環",
+	},
+	stick_other_rgb_description = {
+		en = "Drift the teammates' hue around the colour wheel, with its own starting point and speed, independent of your own cycle.",
+		["zh-cn"] = "让队友标记的颜色绕色环漂移，有自己的起点与速度，与你的循环互不影响。",
+		["zh-tw"] = "讓隊友標記的顏色繞色環漂移，有自己的起點與速度，與你的循環互不影響。",
+	},
+	stick_other_rgb_speed_title = {
+		en = "Teammates' cycle speed",
+		["zh-cn"] = "队友的循环速度",
+		["zh-tw"] = "隊友的循環速度",
+	},
+	stick_other_rgb_speed_description = {
+		en = "How fast the teammates' hue drifts. Independent of your own cycle.",
+		["zh-cn"] = "队友标记的颜色漂移得多快。与你的循环无关。",
+		["zh-tw"] = "隊友標記的顏色漂移得多快。與你的循環無關。",
+	},
+	stick_other_breath_title = {
+		en = "Teammates' breathing",
+		["zh-cn"] = "队友的呼吸灯",
+		["zh-tw"] = "隊友的呼吸燈",
+	},
+	stick_other_breath_description = {
+		en = "A sine brightness sway on teammates' marks, with its own depth and speed, independent of your own breathing.",
+		["zh-cn"] = "队友标记的骨架做正弦明暗呼吸，深度与速度独立设置，与你的呼吸互不影响。",
+		["zh-tw"] = "隊友標記的骨架做正弦明暗呼吸，深度與速度獨立設定，與你的呼吸互不影響。",
+	},
+	stick_other_breath_depth_title = {
+		en = "Teammates' breath depth",
+		["zh-cn"] = "队友的呼吸强度",
+		["zh-tw"] = "隊友的呼吸強度",
+	},
+	stick_other_breath_depth_description = {
+		en = "How far teammates' brightness drops at the bottom of each breath. 0 gives a steady lamp; the ceiling still keeps a fifth of the light, so the mark never blinks out.",
+		["zh-cn"] = "队友标记的骨架每次呼吸最暗时亮度下降多少。填 0 则恒定满亮；最深也只到满亮度的 20%%，所以不会熄灭。",
+		["zh-tw"] = "隊友標記的骨架每次呼吸最暗時亮度下降多少。填 0 則恆定滿亮；最深也只到滿亮度的 20%%，所以不會熄滅。",
+	},
+	stick_other_breath_speed_title = {
+		en = "Teammates' breath speed",
+		["zh-cn"] = "队友的呼吸速度",
+		["zh-tw"] = "隊友的呼吸速度",
+	},
+	stick_other_breath_speed_description = {
+		en = "How fast teammates' marks breathe.",
+		["zh-cn"] = "队友标记的骨架呼吸得多快。",
+		["zh-tw"] = "隊友標記的骨架呼吸得多快。",
+	},
+	stick_other_thickness_title = {
+		en = "Teammates' thickness",
+		["zh-cn"] = "队友的线条粗细",
+		["zh-tw"] = "隊友的線條粗細",
+	},
+	stick_other_thickness_description = {
+		en = "Line thickness for teammates' marks. Thinner than your own by default, so your own mark stays the louder of the two.",
+		["zh-cn"] = "队友标记的线条粗细。默认比你自己的细一点，让你自己的标记更醒目。",
+		["zh-tw"] = "隊友標記的線條粗細。預設比你自己的細一點，讓你自己標記更醒目。",
+	},
+	stick_other_glow_title = {
+		en = "Teammates' glow",
+		["zh-cn"] = "队友的霓虹强度",
+		["zh-tw"] = "隊友的霓虹強度",
+	},
+	stick_other_glow_description = {
+		en = "How far the light spreads from the beads on teammates' marks. 0 leaves a clean line.",
+		["zh-cn"] = "队友标记的珠子向外扩散的光有多远。填 0 只留干净的线。",
+		["zh-tw"] = "隊友標記的珠子向外擴散的光有多遠。填 0 只留乾淨的線。",
+	},
+	stick_other_dot_size_title = {
+		en = "Teammates' joint size",
+		["zh-cn"] = "队友的关节点大小",
+		["zh-tw"] = "隊友的關節點大小",
+	},
+	stick_other_dot_size_description = {
+		en = "Joint dot size on teammates' marks, as a share of their line width. Below 180 the joints stop reading as dots, so that is the floor.",
+		["zh-cn"] = "队友标记的关节点大小，按其线宽的比例计算。低于 180 关节点就不再像点，所以那是下限。",
+		["zh-tw"] = "隊友標記的關節點大小，按其線寬的比例計算。低於 180 關節點就不再像點，所以那是下限。",
+	},
 }

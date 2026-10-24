@@ -11,8 +11,18 @@
 	  1. registers a marker template with the engine's HudElementWorldMarkers;
 	  2. watches the outline system for the class-mark outline names;
 	  3. keeps only elites and specials -- a marked horde body gets no skeleton;
-	  4. asks the engine to draw a skeleton on each kept unit;
-	  5. takes the skeleton back the moment the unit stops qualifying.
+	  4. asks the game's own smart tag who made the mark, so an enemy a teammate
+	     tagged can be told apart from one the player tagged;
+	  5. asks the engine to draw a skeleton on each kept unit;
+	  6. takes the skeleton back the moment the unit stops qualifying.
+
+	WHY STEP 4 IS A FACT AND NOT A GUESS
+	  A marked enemy carries a smart tag, and a smart tag stores the unit and the
+	  Player that created it. A target holds at most one tag at a time, so the
+	  two cases are exclusive: an enemy is either the player's mark or somebody
+	  else's, never both. The class keystones that mark without a tag
+	  (psyker_marked_target and friends) are personal by construction, so "no
+	  tag" counts as the player's own.
 
 	WHY STEP 5 EXISTS, AND WHY IT IS PER-FRAME
 	  A world marker is owned by the engine, not by us. Dropping our own
@@ -78,6 +88,10 @@ local error_count = 0
 local skipped = 0
 local no_breed = 0
 local dropped = 0
+-- Marks owned by other players that were not drawn because the player turned
+-- that set off. Counted so /stick_diag can tell "nothing to show" apart from
+-- "filtered on purpose".
+local other_hidden = 0
 
 -- Reused every frame, so the per-frame path allocates nothing.
 local scratch = {}
@@ -132,6 +146,99 @@ local function breed_of(unit)
 	local ok2, breed = pcall(extension.breed, extension)
 
 	return ok2 and breed or nil
+end
+
+local function local_player()
+	local manager = Managers.player
+
+	if not manager then
+		return nil
+	end
+
+	local ok, player = pcall(manager.local_player, manager)
+
+	return ok and player or nil
+end
+
+local function same_player(a, b)
+	if not a or not b then
+		return false
+	end
+
+	if a == b then
+		return true
+	end
+
+	local unit_a, unit_b = a.player_unit, b.player_unit
+
+	return unit_a ~= nil and unit_a == unit_b
+end
+
+-- Whose tag is on this unit.
+--
+-- The game keeps the answer itself: every smart tag carries the unit and the
+-- Player that created it (`tagger_unit` / `tagger_player`), and
+-- `smart_tag_system:unit_tag()` hands the tag back. One target unit holds at
+-- most ONE tag at a time (the tag extension keeps a single tag id, and a
+-- second tag only lands if its template allows overriding), so a marked enemy
+-- is either yours or somebody else's -- the two looks never have to coexist
+-- on one body.
+--
+--   true  -> the local player tagged it
+--   false -> another player tagged it, or the tag outlived the player who
+--            made it (a tag whose owner left keeps no tagger, and it cannot
+--            be ours: ours always keeps its tagger)
+--   nil   -> there is no smart tag at all. That is the class-keystone mark
+--            (`psyker_marked_target`, `adamant_mark_target`), which is
+--            personal by construction, so the caller reads nil as "mine".
+--
+-- On any failure the answer is nil as well: a HUD that paints an unknown tag
+-- with the player's own colours is wrong in a harmless direction, whereas one
+-- that silently stops drawing is the failure this project has paid for.
+local function tag_owner(unit)
+	local manager = Managers.state and Managers.state.extension
+
+	if not manager or not manager.has_system then
+		return nil
+	end
+
+	local ok_system, has = pcall(manager.has_system, manager, "smart_tag_system")
+
+	if not ok_system or not has then
+		return nil
+	end
+
+	local ok_get, system = pcall(manager.system, manager, "smart_tag_system")
+
+	if not ok_get or not system then
+		return nil
+	end
+
+	local ok_tag, tag = pcall(system.unit_tag, system, unit)
+
+	if not ok_tag or not tag then
+		return nil
+	end
+
+	local me = local_player()
+	local ok_player, tagger_player = pcall(tag.tagger_player, tag)
+
+	if ok_player and tagger_player and me then
+		return same_player(tagger_player, me)
+	end
+
+	local ok_unit, tagger_unit = pcall(tag.tagger_unit, tag)
+	local my_unit = me and me.player_unit
+
+	if ok_unit and tagger_unit and my_unit then
+		return tagger_unit == my_unit
+	end
+
+	return false
+end
+
+local function own_mark(unit)
+	return tag_owner(unit) ~= false
 end
 
 -- Only elites and specials get skeletons: a marked poxwalker is not worth a
@@ -255,9 +362,48 @@ local function drop_unit(event_manager, unit)
 	local record = live[unit]
 
 	live[unit] = nil
+	StickMarker.forget_own(unit)
 
 	if record then
 		remove_marker_id(event_manager, record.id)
+	end
+end
+
+-- Whether marks made by other players are drawn at all. Their own colour set
+-- exists either way; this switch is for the player who only cares about what
+-- they tagged themselves.
+local function others_enabled()
+	local ok, value = pcall(mod.get, mod, "stick_other_enabled")
+
+	if not ok then
+		return true
+	end
+
+	return value ~= false
+end
+
+-- Ownership can change while a skeleton is already up: the instant another
+-- player re-tags the same enemy, the tag on that body stops being ours. It is
+-- one table lookup and one assignment, so it rides the same per-frame pass
+-- that decides whether the marker belongs on screen at all.
+local function refresh_owner(unit)
+	local record = live[unit]
+
+	if not record then
+		return
+	end
+
+	local own = own_mark(unit)
+
+	if own == record.own then
+		return
+	end
+
+	record.own = own
+	StickMarker.set_own(unit, own)
+
+	if not own and not others_enabled() then
+		drop_unit(Managers.event, unit)
 	end
 end
 
@@ -304,6 +450,8 @@ local function enforce()
 		if not ok or not keep then
 			drop_unit(event_manager, unit)
 			dropped = dropped + 1
+		else
+			pcall(refresh_owner, unit)
 		end
 	end
 end
@@ -358,19 +506,26 @@ local function tick()
 
 			if mark_name and unit_alive(unit) and health_alive(unit) then
 				if is_target(unit) then
-					local record = { name = mark_name }
+					local own = own_mark(unit)
 
-					-- Recorded before the trigger: the engine may create the
-					-- marker and answer synchronously, and a re-entrant scan
-					-- must not add the same unit twice.
-					live[unit] = record
+					if own or others_enabled() then
+						local record = { name = mark_name, own = own }
 
-					-- The engine hands back the new marker's id here. That id
-					-- is the only handle `remove_world_marker` accepts; if the
-					-- callback ever comes late, the sweep finds it by unit.
-					pcall(event_manager.trigger, event_manager, "add_world_marker_unit", TEMPLATE, unit, function(marker_id)
-						record.id = marker_id
-					end)
+						-- Recorded before the trigger: the engine may create the
+						-- marker and answer synchronously, and a re-entrant scan
+						-- must not add the same unit twice.
+						live[unit] = record
+						StickMarker.set_own(unit, own)
+
+						-- The engine hands back the new marker's id here. That id
+						-- is the only handle `remove_world_marker` accepts; if the
+						-- callback ever comes late, the sweep finds it by unit.
+						pcall(event_manager.trigger, event_manager, "add_world_marker_unit", TEMPLATE, unit, function(marker_id)
+							record.id = marker_id
+						end)
+					else
+						other_hidden = other_hidden + 1
+					end
 				else
 					skipped = skipped + 1
 				end
@@ -444,6 +599,7 @@ mod.on_disabled = function()
 	skipped = 0
 	no_breed = 0
 	dropped = 0
+	other_hidden = 0
 end
 
 mod.on_game_state_changed = function(status, state_name)
@@ -454,6 +610,7 @@ mod.on_game_state_changed = function(status, state_name)
 		skipped = 0
 		no_breed = 0
 		dropped = 0
+		other_hidden = 0
 	end
 end
 
@@ -502,9 +659,16 @@ mod:command("stick_diag", "MarkedStick: print the current state", function()
 
 	local live_count = 0
 	local no_id = 0
+	local own_count, other_count = 0, 0
 
 	for _, record in pairs(live) do
 		live_count = live_count + 1
+
+		if record.own then
+			own_count = own_count + 1
+		else
+			other_count = other_count + 1
+		end
 
 		if record.id == nil then
 			no_id = no_id + 1
@@ -534,6 +698,13 @@ mod:command("stick_diag", "MarkedStick: print the current state", function()
 		skipped,
 		no_breed,
 		error_count
+	))
+
+	mod:echo(string.format(
+		"owners: mine=%d theirs=%d hidden=%d",
+		own_count,
+		other_count,
+		other_hidden
 	))
 
 	mod:echo("layers: " .. (#names > 0 and table.concat(names, ", ") or "none"))

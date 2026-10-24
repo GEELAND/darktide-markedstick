@@ -57,12 +57,22 @@
 	  a single-colour skeleton.
 
 	THE DISTANCE LADDER
-	  Below the saturation point the figure first spends the scale, then
-	  sheds detail: the bead chains fade out linearly between ratio 0.30 and
-	  0.20, the limb dots between 0.20 and 0.12, and the head / torso dots
-	  never fade -- they are the floor, the last way to find a target. Both
-	  ramps are linear in the same ratio, so a target walking outward loses
-	  detail smoothly instead of stepping between bands.
+	  Below the saturation point the figure spends its scale, and then only
+	  its GLOW: the four halo bands shrink and dim towards a floor, so a
+	  distant skeleton is a thin sharp line rather than a fog blob. The
+	  chains and the joint dots themselves are drawn at every distance -- an
+	  earlier build faded the chains out below ratio 0.20 and left six dots
+	  joined by nothing, which is exactly how a marked enemy at range turned
+	  into an unreadable speck.
+
+	TWO COLOUR SETS: YOUR MARK AND SOMEBODY ELSE'S
+	  The scan asks the game's own entity tag for the tagger (SmartTag keeps
+	  `tagger_unit` / `tagger_player`), so the split is a fact rather than a
+	  guess. A target unit holds at most one tag at a time, which makes the
+	  two sets mutually exclusive. Everything colour-related -- body, head,
+	  cycle, glow, thickness, dot size, breath -- is read once per side; the
+	  group switches, the density and the distance readout stay global,
+	  because they describe the figure and not who tagged it.
 
 	WHAT IS DELIBERATELY NOT HERE
 	  * no line-of-sight test -- a marked enemy behind a wall still has to
@@ -92,6 +102,11 @@ local DEFAULT_THICK = 2
 -- magenta-pink. The whole palette below is derived from this one triple, and
 -- the head colour defaults to the same value.
 local DEFAULT_RGB = { 255, 60, 178 }
+
+-- The fallback for the OTHER players' marks. Cyan on purpose: the two sets are
+-- meant to be told apart at a glance, and cyan is the far side of the wheel
+-- from the default magenta, so an untouched install already shows the split.
+local OTHER_RGB = { 60, 220, 255 }
 
 -- The distance readout keeps the game's own gold: it is a number, not a light.
 local LABEL = { 255, 255, 205, 105 }
@@ -240,11 +255,16 @@ local DOT_LAYERS = {
 
 local TEXT_GAP = 8
 
--- Distance ladder waypoints, in the same ratio as the scale factor. Beads
--- fade out between 0.30 and 0.20; limb dots between 0.20 and 0.12; the head
--- and torso dots never fade.
-local FADE_BEAD_LO, FADE_BEAD_HI = 0.20, 0.30
-local FADE_LIMB_LO, FADE_LIMB_HI = 0.12, 0.20
+-- The figure never loses its lines. An earlier build faded the bead chains
+-- out below ratio 0.20 and kept only the joint dots, so a marked enemy at
+-- range read as six specks with nothing joining them -- reported as "the beads
+-- disappear when the enemy is far". The chains now draw at every distance.
+--
+-- What recedes instead is the GLOW, which is the part that turns into a fog
+-- blob on a distant target. Below HALO_FADE_LO it keeps a floor rather than
+-- vanishing, so a far skeleton is a thin sharp neon line, not a flat wireframe.
+local HALO_FADE_LO, HALO_FADE_HI = 0.12, 0.30
+local HALO_FLOOR = 0.35
 
 -- Fewer usable joints than this and the skeleton is not drawn as one: a
 -- hound or a nurgling gets its two anchor dots instead of a crooked
@@ -355,6 +375,37 @@ template.remove_on_death_duration = 0.5
 -- so bone names stay in exactly one place.
 template.rig = RIG
 template.rig_order = RIG_ORDER
+
+-- Whose tag this is, as last written by MarkedStick.lua. Weak keys: a
+-- destroyed unit's entry must not keep the unit alive.
+--
+--   true  -> the local player's mark
+--   nil   -> unknown, treated as the local player's (a class keystone has no
+--            smart tag at all, and those marks are personal by construction)
+--   false -> somebody else's mark
+--
+-- The marker module never asks the engine itself: the scan already has the
+-- tag in hand, and a second lookup per frame per marker would only be able to
+-- disagree with it.
+local OWN = setmetatable({}, { __mode = "k" })
+
+function template.set_own(unit, is_own)
+	if not unit then
+		return
+	end
+
+	OWN[unit] = is_own and true or false
+end
+
+function template.forget_own(unit)
+	if unit then
+		OWN[unit] = nil
+	end
+end
+
+function template.is_own(unit)
+	return OWN[unit] ~= false
+end
 
 -- `UIFontSettings` is injected by the engine, not required. If it is missing
 -- we fall back to a font name known to exist.
@@ -785,17 +836,17 @@ end
 --
 -- Two shapes have to be survived: a Vector4 default normalised by DMF to
 -- 0..1, and a settings file from an older version that never had this key.
-local function get_rgb(mod, key)
+local function get_rgb(mod, key, fallback)
 	local ok, value = pcall(mod.get, mod, key)
 
 	if not ok or type(value) ~= "table" then
-		return DEFAULT_RGB
+		return fallback
 	end
 
 	local r, g, b = value[2], value[3], value[4]
 
 	if type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
-		return DEFAULT_RGB
+		return fallback
 	end
 
 	if r <= 1 and g <= 1 and b <= 1 then
@@ -887,6 +938,34 @@ local function fade_in(v, lo, hi)
 end
 
 -- ---------------------------------------------------------------------------
+-- The two colour sets
+--
+-- One list of settings, read twice. The local player's set keeps its original
+-- key names, so a settings file from an earlier version carries over
+-- untouched; everybody else's is the same list behind `stick_other_`.
+--
+-- Only the appearance moves with the side. The four group switches, the
+-- density and the distance readout describe the FIGURE, and a skeleton that
+-- loses its legs because somebody else did the tagging would be surprising.
+-- ---------------------------------------------------------------------------
+local function read_side(mod, prefix, fallback_rgb)
+	local cfg = {}
+
+	cfg.color = get_rgb(mod, prefix .. "color", fallback_rgb)
+	cfg.head = get_rgb(mod, prefix .. "head_color", cfg.color)
+	cfg.rgb = get_flag(mod, prefix .. "rgb", true)
+	cfg.rgb_speed = get_number(mod, prefix .. "rgb_speed", 100, 10, 300) / 100
+	cfg.breath = get_flag(mod, prefix .. "breath", true)
+	cfg.breath_low = 1 - get_number(mod, prefix .. "breath_depth", BREATH_DEPTH_PCT, 0, BREATH_DEPTH_MAX) / 100
+	cfg.breath_speed = get_number(mod, prefix .. "breath_speed", 100, 10, 300) / 100
+	cfg.thick = get_number(mod, prefix .. "thickness", DEFAULT_THICK, 1, 8)
+	cfg.glow = get_number(mod, prefix .. "glow", 100, 0, 200) / 100
+	cfg.dot = math.max(DOT_MIN_RATIO, get_number(mod, prefix .. "dot_size", 180, 120, 300) / 100)
+
+	return cfg
+end
+
+-- ---------------------------------------------------------------------------
 -- Per-frame layout
 -- ---------------------------------------------------------------------------
 
@@ -895,10 +974,14 @@ end
 -- accumulator would run the breath four times as fast.
 local clock = 0
 
--- When the colour cycle was switched on. nil means "not running". Module
+-- When each colour cycle was switched on. nil means "not running". Module
 -- level on purpose: every marked enemy drifts together, and four skeletons
 -- cycling out of step would look like a fault.
-local rgb_origin = nil
+--
+-- One origin PER SIDE. A shared one cannot work once the two sides have their
+-- own on/off and speed: the side with the cycle off would clear the origin
+-- every frame and freeze the side that has it on.
+local rgb_origin = { own = nil, other = nil }
 
 local function frame_time(dt, t)
 	if type(t) == "number" then
@@ -939,13 +1022,27 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 	end
 
 	local mod = get_mod("MarkedStick")
+
+	-- Whose mark this is decides which colour set paints it. `is_own` returns
+	-- false only when the scan positively identified another player's tag.
+	local own = template.is_own(unit)
+	local side_rgb = own and DEFAULT_RGB or OTHER_RGB
+
 	local show = { head = true, torso = true, arms = true, legs = true }
-	local thick, glow_scale, dot_ratio, max_beads = DEFAULT_THICK, 1, DOT_MIN_RATIO, BEAD_MAX
 	local show_distance = true
-	local rgb = DEFAULT_RGB
-	local head_rgb = DEFAULT_RGB
-	local breath_on, breath_speed, breath_low = false, 1, 1 - BREATH_DEPTH_PCT / 100
-	local rgb_on, rgb_speed = false, 1
+	local max_beads = BEAD_MAX
+	local cfg = {
+		color = side_rgb,
+		head = side_rgb,
+		rgb = false,
+		rgb_speed = 1,
+		breath = false,
+		breath_low = 1 - BREATH_DEPTH_PCT / 100,
+		breath_speed = 1,
+		thick = DEFAULT_THICK,
+		glow = 1,
+		dot = DOT_MIN_RATIO,
+	}
 
 	if mod then
 		show.head = get_flag(mod, "stick_show_head", true)
@@ -953,21 +1050,8 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 		show.arms = get_flag(mod, "stick_show_arms", true)
 		show.legs = get_flag(mod, "stick_show_legs", true)
 		show_distance = get_flag(mod, "stick_show_distance", true)
-		thick = get_number(mod, "stick_thickness", DEFAULT_THICK, 1, 8)
-		-- 0 turns every halo band off and leaves the lit cores; 200 doubles
-		-- every halo width.
-		glow_scale = get_number(mod, "stick_glow", 100, 0, 200) / 100
-		-- The slider moves the dot away from the floor, never below it: a
-		-- joint smaller than 1.8 line widths stops reading as a joint.
-		dot_ratio = math.max(DOT_MIN_RATIO, get_number(mod, "stick_dot_size", 180, 120, 300) / 100)
 		max_beads = get_number(mod, "stick_density", BEAD_MAX, 4, BEAD_MAX)
-		rgb = get_rgb(mod, "stick_color")
-		head_rgb = get_rgb(mod, "stick_head_color")
-		breath_on = get_flag(mod, "stick_breath", false)
-		breath_speed = get_number(mod, "stick_breath_speed", 100, 10, 300) / 100
-		breath_low = 1 - get_number(mod, "stick_breath_depth", BREATH_DEPTH_PCT, 0, BREATH_DEPTH_MAX) / 100
-		rgb_on = get_flag(mod, "stick_rgb", false)
-		rgb_speed = get_number(mod, "stick_rgb_speed", 100, 10, 300) / 100
+		cfg = read_side(mod, own and "stick_" or "stick_other_", side_rgb)
 	end
 
 	if not (show.head or show.torso or show.arms or show.legs) then
@@ -987,27 +1071,28 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 	-- of handing it a different base. The head colour drifts from its own
 	-- picked hue on the same phase, so the two stay in step without merging.
 	local phase = 0
+	local origin_key = own and "own" or "other"
 
-	if rgb_on then
-		if not rgb_origin then
-			rgb_origin = now
+	if cfg.rgb then
+		if not rgb_origin[origin_key] then
+			rgb_origin[origin_key] = now
 		end
 
-		phase = (now - rgb_origin) * rgb_speed / RGB_PERIOD
+		phase = (now - rgb_origin[origin_key]) * cfg.rgb_speed / RGB_PERIOD
 	else
-		rgb_origin = nil
+		rgb_origin[origin_key] = nil
 	end
 
 	local function base_of(picked)
-		if not rgb_on then
+		if not cfg.rgb then
 			return picked
 		end
 
 		return hue_rgb(hue_of(picked) + phase)
 	end
 
-	local palette = palette_from(base_of(rgb))
-	local head_palette = palette_from(base_of(head_rgb))
+	local palette = palette_from(base_of(cfg.color))
+	local head_palette = palette_from(base_of(cfg.head))
 
 	-- Where the engine put the widget: the projected unit_node. Without it
 	-- no offset in this file means anything.
@@ -1072,10 +1157,15 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 	local fig_h = math.max(1, max_y - min_y)
 	local ratio = math.min(1, fig_h / STICK_REF_H)
 
-	local base_core = thick + NEON_CORE_EXTRA
+	local base_core = cfg.thick + NEON_CORE_EXTRA
 	local core = math.max(LINE_MIN_CORE, base_core * ratio)
 	local bead = core
-	local dot = math.max(DOT_MIN_PX, core * dot_ratio)
+	local dot = math.max(DOT_MIN_PX, core * cfg.dot)
+
+	-- How much of the glow survives at this distance. The cores always draw;
+	-- this is the only thing the distance takes away, so a far target is a
+	-- clean line instead of a disappearing one.
+	local halo_range = HALO_FLOOR + (1 - HALO_FLOOR) * fade_in(ratio, HALO_FADE_LO, HALO_FADE_HI)
 
 	-- The halo widths. Every constant term scales too: a fixed 5 px skirt on
 	-- a 1 px line is the "one thin line with a fat cloud" failure the whole
@@ -1084,36 +1174,35 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 	-- once the widths have nowhere left to grow.
 	local pads = nil
 
-	if glow_scale > 0.01 then
+	if cfg.glow > 0.01 then
 		pads = {
-			out = (base_core * NEON_OUT_PAD.mul + NEON_OUT_PAD.add) * ratio * glow_scale,
-			mid = (base_core * NEON_MID_PAD.mul + NEON_MID_PAD.add) * ratio * glow_scale,
-			inn = (base_core * NEON_IN_PAD.mul + NEON_IN_PAD.add) * ratio * glow_scale,
+			out = (base_core * NEON_OUT_PAD.mul + NEON_OUT_PAD.add) * ratio * cfg.glow * halo_range,
+			mid = (base_core * NEON_MID_PAD.mul + NEON_MID_PAD.add) * ratio * cfg.glow * halo_range,
+			inn = (base_core * NEON_IN_PAD.mul + NEON_IN_PAD.add) * ratio * cfg.glow * halo_range,
 		}
 	end
 
 	local halo_gain = 0
 
-	if glow_scale > 0 then
-		halo_gain = math.min(1.5, glow_scale ^ 0.7)
+	if cfg.glow > 0 then
+		halo_gain = math.min(1.5, cfg.glow ^ 0.7) * halo_range
 	end
-
-	local beads_alpha = fade_in(ratio, FADE_BEAD_LO, FADE_BEAD_HI)
-	local limb_dots = fade_in(ratio, FADE_LIMB_LO, FADE_LIMB_HI)
 
 	-- The breath multiplies every light in the figure -- beads and dots, never
 	-- the label: a number that pulses is harder to read, not easier.
 	local breath = 1
 
-	if breath_on then
-		breath = breath_gain(now, breath_speed, breath_low)
+	if cfg.breath then
+		breath = breath_gain(now, cfg.breath_speed, cfg.breath_low)
 	end
 
 	local minimal = count < MIN_JOINTS
 
-	-- Below one alpha step the whole chain is invisible, so the segments are
-	-- skipped rather than computed and hidden.
-	if beads_alpha * breath * NEON_ALPHA.core >= 1 then
+	-- The chains are drawn at every distance now, so the only reason to skip
+	-- them is a breath that has faded them below one alpha step -- which the
+	-- depth ceiling already makes impossible, and which is still cheaper to
+	-- test than to draw.
+	if breath * NEON_ALPHA.core >= 1 then
 		for s = 1, #SEGMENTS do
 			local seg = SEGMENTS[s]
 
@@ -1125,7 +1214,7 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 					-- else with the body colour.
 					local tint = (seg.group == "head") and head_palette or palette
 
-					if chain(style, s, a.x, a.y, b.x, b.y, bead, pads, beads_alpha * breath, halo_gain, max_beads, tint) > 0 then
+					if chain(style, s, a.x, a.y, b.x, b.y, bead, pads, breath, halo_gain, max_beads, tint) > 0 then
 						content["show_" .. seg.group] = true
 					end
 				end
@@ -1140,15 +1229,11 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 		-- In minimal mode only the two anchors survive: they are what still
 		-- points at the enemy when the rest of the figure is unreadable.
 		if show[def.group] and j and (not minimal or def.joint == "head" or def.joint == "hips") then
-			local alpha = 1
-
-			if def.group == "arms" or def.group == "legs" then
-				alpha = limb_dots
-			end
-
+			-- Dots no longer fade with distance either: they are the joints
+			-- of the chains, and a chain that ends in mid-air reads as a bug.
 			local tint = (def.group == "head") and head_palette or palette
 
-			if place_dot(style, def.key, j.x, j.y, dot, alpha * breath, halo_gain, tint) then
+			if place_dot(style, def.key, j.x, j.y, dot, breath, halo_gain, tint) then
 				content["show_" .. def.group] = true
 			end
 		end
