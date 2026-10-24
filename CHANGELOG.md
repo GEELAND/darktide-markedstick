@@ -3,6 +3,22 @@
 The public version numbering starts here. Earlier internal iteration numbers
 are archived under `build/dev/` and never shipped.
 
+## 0.2.1
+
+- Bead count range widened to 2-24 (was 4-14). The ceiling now bites both at
+  point-blank range and on the long segments, so the slider has somewhere to
+  go; 2 leaves only the two end beads.
+- Fixed the neon strength knob reading as dead. It only ever scaled the halo
+  widths by the projected figure size, which collapses to a fraction of a pixel
+  at range -- so on exactly the distant targets this mod now draws, the slider
+  did nothing. The halo now also carries a small pixel floor and a steeper
+  brightness curve, so the knob widens and brightens the glow at every
+  distance, and 0 still means a bare line.
+- New `/stick_glow` command: prints the numbers the last drawn frame used
+  (setting, projected ratio, core and halo widths, brightness lift). It turns
+  "the slider does nothing" into either "the module computed zero" or "the
+  engine ignored a non-zero" without another guessing round.
+
 ## 0.2.0
 
 - The skeleton no longer loses its lines with range. The bead chains and the

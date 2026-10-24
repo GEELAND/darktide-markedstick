@@ -710,6 +710,38 @@ mod:command("stick_diag", "MarkedStick: print the current state", function()
 	mod:echo("layers: " .. (#names > 0 and table.concat(names, ", ") or "none"))
 end)
 
+-- The glow knob, as the last drawn frame saw it. Two chat lines, because
+-- "the neon strength does nothing" splits into two causes that look identical
+-- on screen: a zero computed here, or an engine that ignores a non-zero.
+mod:command("stick_glow", "MarkedStick: print the glow numbers of the last drawn frame", function()
+	local last = StickMarker.last
+
+	if not last or not last.glow then
+		mod:echo("glow: nothing drawn yet -- mark an elite or special, then run this again")
+		return
+	end
+
+	local pads = last.pads
+
+	mod:echo(string.format(
+		"glow: setting=%d ratio=%.3f core=%.2f bead=%.2f lift=%.2f own=%s dist=%s",
+		math.floor(last.glow * 100 + 0.5),
+		last.ratio,
+		last.core,
+		last.bead,
+		last.gain,
+		tostring(last.own),
+		last.dist and string.format("%.1f", last.dist) or "?"
+	))
+
+	mod:echo(string.format(
+		"bands: out=%s mid=%s inn=%s",
+		pads and string.format("%.2f", pads.out) or "off",
+		pads and string.format("%.2f", pads.mid) or "off",
+		pads and string.format("%.2f", pads.inn) or "off"
+	))
+end)
+
 -- ---------------------------------------------------------------------------
 -- /stick_rig -- the rig probe. This build's whole reason to exist.
 --

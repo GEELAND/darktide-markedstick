@@ -105,9 +105,9 @@ return {
 		["zh-tw"] = "霓虹強度（%%）",
 	},
 	stick_glow_description = {
-		en = "How far the light spreads from the beads. 0 turns all four halo bands off and leaves only the lit cores; above 100 widens every band. The bands scale with the figure's own size, so a distant target never becomes a blur blob.",
-		["zh-cn"] = "光从珠子向外扩散的范围。0 会关掉全部四层光晕、只留发光的芯；超过 100 会加宽每一层。光晕尺寸随骨架自身大小缩放，远处的目标不会糊成一团。",
-		["zh-tw"] = "光從珠子向外擴散的範圍。0 會關掉全部四層光暈、只留發光的芯；超過 100 會加寬每一層。光暈尺寸隨骨架自身大小縮放，遠處的目標不會糊成一團。",
+		en = "How far the light spreads from the beads, and how bright that skirt is. 0 turns all four halo bands off and leaves only the lit cores; above 100 widens every band and brightens it. The bands still scale with the figure, but a small pixel floor keeps the knob readable on a distant target instead of scaling to nothing.",
+		["zh-cn"] = "光从珠子向外扩散的范围，以及这层光的亮度。0 会关掉全部四层光晕、只留发光的芯；超过 100 会同时加宽并提亮每一层。光晕仍随骨架缩放，但保留了一个最小像素宽度，所以远处的目标上这个滑块也不会变成没反应。",
+		["zh-tw"] = "光從珠子向外擴散的範圍，以及這層光的亮度。0 會關掉全部四層光暈、只留發光的芯；超過 100 會同時加寬並提亮每一層。光暈仍隨骨架縮放，但保留了一個最小像素寬度，所以遠處的目標上這個滑桿也不會變成沒反應。",
 	},
 	stick_dot_size_title = {
 		en = "Joint dot size (%%)",
@@ -125,9 +125,9 @@ return {
 		["zh-tw"] = "每段珠子數",
 	},
 	stick_density_description = {
-		en = "Maximum number of beads on one skeleton segment. More beads make the lines denser and smoother; fewer saves performance. The design case is four marked enemies at once, where even the maximum is not a problem, so this only needs turning down on very weak hardware.",
-		["zh-cn"] = "单条骨架线段上最多放多少颗珠子。珠子越多线条越密、越顺滑；调小可以省性能。设计场景是场上同时 4 个标记，那时即使拉满也不是问题，所以只有很弱的机器才需要往下调。",
-		["zh-tw"] = "單條骨架線段上最多放多少顆珠子。珠子越多線條越密、越順滑；調小可以省效能。設計場景是場上同時 4 個標記，那時即使拉滿也不是問題，所以只有很弱的機器才需要往下調。",
+		en = "Upper limit on how many beads one skeleton segment may use. A segment gets as many as fit at the current bead size, so the ceiling bites wherever there is room left to fill: hard at point-blank range, and still on the long segments (spine, thighs) at mid range. Lower it to thin the cord, or to save performance on a weak machine.",
+		["zh-cn"] = "单条骨架线段上最多放多少颗珠子。每段实际会放到“当前珠径下装得下”的数量，所以只要还有空间，上限就会起作用：贴脸时最明显，中等距离上长线段（脊椎、大腿）也照样吃得到。调低会让线更细，也能省性能。",
+		["zh-tw"] = "單條骨架線段上最多放多少顆珠子。每段實際會放到「目前珠徑下裝得下」的數量，所以只要還有空間，上限就會起作用：貼臉時最明顯，中等距離上長線段（脊椎、大腿）也照樣吃得到。調低會讓線更細，也能省效能。",
 	},
 	stick_show_head_title = {
 		en = "Head and neck",

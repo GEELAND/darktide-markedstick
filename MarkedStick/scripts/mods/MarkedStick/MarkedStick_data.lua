@@ -244,14 +244,15 @@ return {
 			},
 			{
 				-- Beads per segment, and the only performance lever in the mod.
-				-- Four marked enemies at the default is the design case, so the
-				-- default spends the full budget.
+				-- The ceiling is 24 because a segment is only ~100 px long even
+				-- at point-blank range: past that the beads already touch and a
+				-- higher number would do nothing. 2 leaves the two end beads.
 				setting_id = "stick_density",
 				type = "numeric",
 				title = "stick_density_title",
 				tooltip = "stick_density_description",
 				default_value = 14,
-				range = { 4, 14 },
+				range = { 2, 24 },
 				decimals_number = 0,
 				step_size_value = 1,
 			},

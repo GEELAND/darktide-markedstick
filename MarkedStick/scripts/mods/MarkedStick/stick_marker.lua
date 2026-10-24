@@ -208,7 +208,12 @@ local BEAD_SPACING_RATIO = 0.70
 -- Beads per segment, and the only performance lever in the module. When the
 -- cap forces a wider spacing the beads get THICKER rather than leaving a
 -- gap: a broken line reads as a bug, a fat one merely reads as close.
-local BEAD_MAX = 14
+--
+-- 24 is the ceiling because a segment is only ever ~100 px long at close
+-- range: beyond that the cap stops binding and the slider does nothing, so a
+-- larger number would be a lie. The player can go down to 2, which leaves the
+-- two end beads and nothing between them.
+local BEAD_MAX = 24
 
 -- Dot diameter as a share of the line width. 1.8 is a hard floor, not a
 -- default: below it the joint stops reading as a dot and becomes another
@@ -225,6 +230,22 @@ local NEON_CORE_EXTRA = 1.5
 local NEON_OUT_PAD = { mul = 2.5, add = 5.0 }
 local NEON_MID_PAD = { mul = 1.3, add = 2.5 }
 local NEON_IN_PAD = { mul = 0.6, add = 1.0 }
+
+-- The glow knob's pixel floor, quoted at glow 100. The proportional term above
+-- is right for a target you can touch, but at range it collapses to a fraction
+-- of a pixel -- so the halo scaled to nothing and the slider read as dead
+-- exactly on the enemies this mod now draws at every distance. The floor is
+-- multiplied by the setting (0 still means no halo at all) and by the range
+-- factor (a far target keeps a hint of glow, not a fog bank).
+local GLOW_PAD_FLOOR = { out = 2.6, mid = 1.5, inn = 0.8 }
+
+-- How hard the halo's brightness follows the knob. At 1 it is the canonical
+-- 252 / 158 / 66 / 28 ladder; the top of the range is steep on purpose, so
+-- 200 is a visibly hotter tube and not merely a wider one. Capped so the inner
+-- band cannot clip itself into a flat, hard-edged white frame.
+local function glow_lift(glow)
+	return math.min(2.4, glow ^ 0.85)
+end
 
 -- Alpha ladder for the four bands, before the figure's own alpha is applied.
 local NEON_ALPHA = { out = 28, mid = 66, inn = 158, core = 252 }
@@ -302,10 +323,15 @@ local RGB_PERIOD = 9.0
 -- closer frame is the classic pooled-render residue bug -- a bead floating
 -- where the skeleton used to be.
 --
--- Budget: 14 segments x 14 beads x 4 bands = 784, plus 6 dots x 4 bands = 24,
--- plus the 2 label copies = 810. Four marked enemies at once is 3240 passes,
--- which the design case accepts; the density setting is the lever if a weak
--- machine ever says otherwise (14 -> 8 takes the pool to 474).
+-- Budget: 14 segments x 24 beads x 4 bands = 1344, plus 6 dots x 4 bands =
+-- 24, plus the 2 label copies = 1370. The pool is sized for the ceiling, not
+-- for the current density: the setting can be raised mid-mission and the pool
+-- cannot grow, so the slots have to exist up front.
+--
+-- The density setting is the lever if a weak machine ever says otherwise:
+-- 24 -> 8 drops the pass count per marker from 1370 to 474 (only the slots
+-- actually used are drawn, so the cost falls with the setting, not just the
+-- memory).
 -- ---------------------------------------------------------------------------
 
 -- KEYS[segment][bead] = { ["_o"] = <outer id>, ["_m"] = <mid id>,
@@ -983,6 +1009,13 @@ local clock = 0
 -- every frame and freeze the side that has it on.
 local rgb_origin = { own = nil, other = nil }
 
+-- What the last frame actually drew with. Written once per drawn frame into a
+-- table that is never reallocated, and read by /stick_glow. It exists because
+-- "the glow slider does nothing" has two very different causes -- the module
+-- computing a zero, or the engine ignoring what it computed -- and one chat
+-- line of numbers tells them apart without another guessing round.
+local LAST = {}
+
 local function frame_time(dt, t)
 	if type(t) == "number" then
 		return t
@@ -1167,25 +1200,31 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 	-- clean line instead of a disappearing one.
 	local halo_range = HALO_FLOOR + (1 - HALO_FLOOR) * fade_in(ratio, HALO_FADE_LO, HALO_FADE_HI)
 
-	-- The halo widths. Every constant term scales too: a fixed 5 px skirt on
-	-- a 1 px line is the "one thin line with a fat cloud" failure the whole
-	-- scale factor exists to prevent. The intensity knob scales the widths
-	-- AND buys brightness, so the top half of its range still does something
-	-- once the widths have nowhere left to grow.
+	-- The halo widths: the proportional term, plus a floor in pixels so the
+	-- knob still bites at range. Both terms are multiplied by the setting (0
+	-- stays a bare line) and by the range factor.
 	local pads = nil
 
 	if cfg.glow > 0.01 then
+		local floor_scale = cfg.glow * (0.35 + 0.65 * halo_range)
+		local out_scaled = (base_core * NEON_OUT_PAD.mul + NEON_OUT_PAD.add) * ratio * cfg.glow * halo_range
+		local mid_scaled = (base_core * NEON_MID_PAD.mul + NEON_MID_PAD.add) * ratio * cfg.glow * halo_range
+		local inn_scaled = (base_core * NEON_IN_PAD.mul + NEON_IN_PAD.add) * ratio * cfg.glow * halo_range
+		local out_floor = GLOW_PAD_FLOOR.out * floor_scale
+		local mid_floor = GLOW_PAD_FLOOR.mid * floor_scale
+		local inn_floor = GLOW_PAD_FLOOR.inn * floor_scale
+
 		pads = {
-			out = (base_core * NEON_OUT_PAD.mul + NEON_OUT_PAD.add) * ratio * cfg.glow * halo_range,
-			mid = (base_core * NEON_MID_PAD.mul + NEON_MID_PAD.add) * ratio * cfg.glow * halo_range,
-			inn = (base_core * NEON_IN_PAD.mul + NEON_IN_PAD.add) * ratio * cfg.glow * halo_range,
+			out = out_floor > out_scaled and out_floor or out_scaled,
+			mid = mid_floor > mid_scaled and mid_floor or mid_scaled,
+			inn = inn_floor > inn_scaled and inn_floor or inn_scaled,
 		}
 	end
 
 	local halo_gain = 0
 
 	if cfg.glow > 0 then
-		halo_gain = math.min(1.5, cfg.glow ^ 0.7) * halo_range
+		halo_gain = glow_lift(cfg.glow) * halo_range
 	end
 
 	-- The breath multiplies every light in the figure -- beads and dots, never
@@ -1284,6 +1323,18 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 		label.offset[2] = base
 		label.visible = content.show_label
 	end
+
+	LAST.glow = cfg.glow
+	LAST.ratio = ratio
+	LAST.core = core
+	LAST.bead = bead
+	LAST.pads = pads
+	LAST.gain = halo_gain
+	LAST.own = own
+	LAST.dist = dist
 end
+
+-- Read by /stick_glow in MarkedStick.lua.
+template.last = LAST
 
 return template

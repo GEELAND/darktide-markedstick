@@ -20,7 +20,7 @@
 //      * check_line_of_sight is false -- the single field this mod exists for;
 //      * the coordinate space is 2048 px, because a whole figure at point-blank
 //        range would clip at 768;
-//      * 810 passes allocated ONCE: 784 bead rects + 24 dot rects + 2 labels.
+//      * 1370 passes allocated ONCE: 1344 bead rects + 24 dot rects + 2 labels.
 //
 //   C. the geometry (a real pinhole projection is stubbed: focal 900 px,
 //      camera at the origin looking down +Y, 1920x1080 canvas)
@@ -565,10 +565,10 @@ end
 
 -- The pool is allocated once, here, and never grows or shrinks at runtime:
 -- 14 segments x 14 beads x 4 bands + 6 dots x 4 bands + 2 labels = 810.
-check(rects == 808, "the pool holds 784 bead rects + 24 dot rects (got " .. rects .. ")")
+check(rects == 1368, "the pool holds 1344 bead rects + 24 dot rects (got " .. rects .. ")")
 check(texts == 2, "2 label copies: shadow + bright (got " .. texts .. ")")
 check(others == 0, "no unexpected pass types (got " .. others .. ")")
-check(#def.passes == 810, "810 passes in total: 4 bands per bead, the ladder that makes it read as neon (got " .. #def.passes .. ")")
+check(#def.passes == 1370, "1370 passes in total: 4 bands per bead, the ladder that makes it read as neon (got " .. #def.passes .. ")")
 check(ids.label and ids.label_shadow, "both label style ids exist")
 check(def.style.label.visible == false and def.style.label_shadow.visible == false,
 	"the placeholder labels start invisible")
@@ -1194,12 +1194,13 @@ local function residue_tests()
 				biggest = st.size[1]
 			end
 
-			-- A bead that survived from the 3 m frame would still carry that
-			-- frame's 9.5 px core. At 50 m the core is a hairline, so any bead
-			-- wider than the far frame's own core is residue.
+			-- A bead CORE that survived from the 3 m frame would still carry
+			-- that frame's 9.5 px size. At 50 m the core is a hairline, so any
+			-- core wider than the far frame's own is residue. Halo bands are
+			-- excluded: they legitimately keep a small pixel floor now.
 			local id = def.passes[i].style_id
 
-			if id and string.sub(id, 1, 1) == "b" and st.size[1] > 2.5 then
+			if id and string.sub(id, 1, 1) == "b" and string.sub(id, -2) == "_c" and st.size[1] > 2.5 then
 				stale_beads = stale_beads + 1
 			end
 		end
@@ -1232,6 +1233,88 @@ local function residue_tests()
 end
 
 residue_tests()
+
+-- The glow knob has to move something at BOTH ends of the distance ladder:
+-- near, where the proportional width term dominates, and far, where only the
+-- pixel floor is left. A knob that only works at knife range is exactly the
+-- "the neon strength does nothing" report this guards against.
+local function glow_tests()
+	local function halo_at(dist, glow)
+		SETTINGS.stick_glow = glow
+		local d = frame(mkunit("glow_" .. dist, dist, ELITE), dist)
+
+		return d.style.b2_1_o.size[1], d.style.b2_1_o.color[1], d.style.b2_1_c.size[1]
+	end
+
+	local n0_w, n0_a = halo_at(8, 0)
+	local n1_w, n1_a = halo_at(8, 100)
+	local n2_w, n2_a, n2_core = halo_at(8, 200)
+	local f1_w, f1_a = halo_at(45, 100)
+	local f2_w, f2_a = halo_at(45, 200)
+
+	check(n0_w == 0 and n0_a == 255, "glow 0 draws no halo band at all (size " .. n0_w .. ")")
+	check(n1_w > n0_w + 4, "glow 100 adds a real skirt (" .. string.format("%.1f", n0_w) .. " -> " .. string.format("%.1f", n1_w) .. " px)")
+	check(n2_w > n1_w + 4, "and 200 is wider again (" .. string.format("%.1f", n2_w) .. " px)")
+	check(n2_a > n1_a, "200 is brighter too, not only wider (" .. n1_a .. " -> " .. n2_a .. " alpha)")
+
+	-- The knob is a glow knob: it must not quietly resize the filament.
+	check(math.abs(n2_core - frame(mkunit("glow_core", 8, ELITE), 8).style.b2_1_c.size[1]) < 0.01,
+		"the core keeps its width -- this knob is glow, not thickness")
+
+	-- Far end: the proportional term is a fraction of a pixel there, so the
+	-- pixel floor is the only reason the slider still does anything.
+	check(f2_w > f1_w + 0.8,
+		"at 45 m the knob still moves the halo (" .. string.format("%.2f", f1_w) .. " -> " .. string.format("%.2f", f2_w) .. " px)")
+	check(f2_a >= f1_a, "and never dims it on the way up")
+
+	-- The probe command exists so "the slider does nothing" can be split into
+	-- "the module computed a zero" and "the engine ignored it" without another
+	-- guessing round.
+	echo_lines = {}
+	commands.stick_glow()
+
+	local glow_diag = table.concat(echo_lines, " | ")
+
+	check(string.find(glow_diag, "glow: setting=", 1, true) ~= nil,
+		"/stick_glow reports the numbers the last frame drew with")
+	check(string.find(glow_diag, "bands: out=", 1, true) ~= nil,
+		"including the three halo widths")
+
+	SETTINGS.stick_glow = 50
+end
+
+glow_tests()
+
+-- The bead ceiling: wider range, and honest about when it stops mattering.
+local function density_tests()
+	SETTINGS.stick_glow = 50
+
+	SETTINGS.stick_density = 24
+	local hi_near = visible_beads(frame(mkunit("den_hi", 2, ELITE), 2))
+
+	SETTINGS.stick_density = 8
+	local lo_near = visible_beads(frame(mkunit("den_lo", 2, ELITE), 2))
+
+	check(hi_near > lo_near * 1.5,
+		"at point-blank the ceiling really packs more beads (" .. lo_near .. " -> " .. hi_near .. ")")
+	check(hi_near > 14 * 8, "and the new 24 ceiling is reachable at all (" .. hi_near .. " beads on screen)")
+
+	-- The ceiling still bites at range on the long segments (spine, thighs),
+	-- which is what makes the wider range worth having rather than a knob that
+	-- only works when you are touching the enemy.
+	SETTINGS.stick_density = 24
+	local hi_far = visible_beads(frame(mkunit("den_hi_far", 10, ELITE), 10))
+
+	SETTINGS.stick_density = 14
+	local mid_far = visible_beads(frame(mkunit("den_mid_far", 10, ELITE), 10))
+
+	check(hi_far > mid_far * 1.15,
+		"and it still bites at 10 m on the long segments (" .. mid_far .. " -> " .. hi_far .. ")")
+
+	SETTINGS.stick_density = 14
+end
+
+density_tests()
 
 local function switch_tests()
 	-- The group switches gate their own passes, through the same content flags
@@ -1292,6 +1375,9 @@ switch_tests()
 -- are the fix, and the assertions below read the ladder off the drawn passes.
 
 local function band_tests()
+	-- The canonical ladder is quoted at glow 100, so the measurement is taken
+	-- there rather than inheriting whatever the previous test left behind.
+	SETTINGS.stick_glow = 100
 	local U = mkunit("bands", 10, ELITE)
 	local def = frame(U, 10)
 	local core, inn, mid, out = def.style.b2_1_c, def.style.b2_1_i, def.style.b2_1_m, def.style.b2_1_o
@@ -2130,7 +2216,7 @@ local expected = {
 	{ id = "stick_other_thickness", type = "numeric", default = 6,  range = { 1, 8 } },
 	{ id = "stick_other_glow",    type = "numeric",  default = 50,  range = { 0, 200 } },
 	{ id = "stick_other_dot_size", type = "numeric", default = 120, range = { 120, 300 } },
-	{ id = "stick_density",       type = "numeric",  default = 14,  range = { 4, 14 } },
+	{ id = "stick_density",       type = "numeric",  default = 14,  range = { 2, 24 } },
 	{ id = "stick_show_head",     type = "checkbox", default = true },
 	{ id = "stick_show_torso",    type = "checkbox", default = true },
 	{ id = "stick_show_arms",     type = "checkbox", default = true },
@@ -2315,6 +2401,9 @@ rline(markerText.includes("template.rig = RIG") && markerText.includes("template
 // The commands.
 rline(mainText.includes('mod:command("stick_rig"') && mainText.includes('mod:command("stick_diag"'),
   "both chat commands exist under their own names");
+rline(mainText.includes('mod:command("stick_glow"'), "the glow probe command exists as well");
+rline(markerText.includes("template.last = LAST"),
+  "the marker exposes the last frame's numbers for /stick_glow");
 
 // The .mod manifest.
 rline(modText.includes('new_mod("MarkedStick"'), "the .mod registers MarkedStick");

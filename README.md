@@ -14,7 +14,7 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 ## Install
 
 1. Install DMF.
-2. Unzip `MarkedStick_v0.2.0.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
+2. Unzip `MarkedStick_v0.2.1.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
 3. Enable **Stick Skeleton** in the in-game mod list.
 
 **The zip must be unzipped.** Dropping the archive into `mods` does nothing -- the framework only scans `.mod` files, and a zipped mod simply never appears in the list.
@@ -41,14 +41,14 @@ Range never takes the lines away. The chains and the joint dots are drawn at eve
 | RGB cycle / speed | on / 100 | hue drifts from your picked colour, 9 s per lap at 100 |
 | Breathing / depth / speed | on / 40 / 300 | sine brightness sway; depth is capped at 80 so it can never blink out |
 | Line thickness | 8 | bead core width in pixels at close range |
-| Glow | 50 | halo spread; 0 leaves only the lit cores |
+| Glow | 50 | halo spread and brightness; 0 leaves only the lit cores. A small pixel floor keeps it working at range |
 | Joint dot size | 120 | percentage of line width, floored at 180 % |
 | Teammates' marks | on | draw enemies a teammate tagged too; off draws yours only |
 | Teammates' colour / head colour | cyan | their own set, independent of yours |
 | Teammates' cycle / speed | on / 100 | their cycle has its own origin and speed |
 | Teammates' breathing / depth / speed | on / 40 / 300 | independent of your own breathing |
 | Teammates' thickness / glow / joint size | 6 / 50 / 120 | a touch thinner by default, so your own mark stays the louder one |
-| Beads per segment | 14 | the performance lever; 8 halves the pass count |
+| Beads per segment | 14 | ceiling, 2-24. Also the performance lever |
 | Head / torso / arms / legs / distance | on | per-group switches, shared by both sets |
 
 With the default thickness of 8 the joint dots sit on their 1.8x floor, so the size slider only starts to bite above 180.
@@ -59,8 +59,9 @@ With the default thickness of 8 the joint dots sit on their 1.8x floor, so the s
 |---|---|
 | `/stick_diag` | lifecycle state: units tracked, marked, markers alive, error counters |
 | `/stick_rig` | dumps the real skeleton of a marked unit -- every bone name the game will enumerate, each joint candidate with its world position, and the breed's hit zones. Long output, 40 lines per page; run it again for the next page. |
+| `/stick_glow` | prints the numbers the last drawn frame used for the neon glow: setting, projected ratio, core and halo widths, brightness lift. Attach it if the glow slider ever looks dead. |
 
-`/stick_rig` is the diagnostic to attach to a bug report if a limb is missing.
+`/stick_rig` is the diagnostic to attach to a bug report if a limb is missing, `/stick_glow` if the neon strength looks wrong.
 
 ## Limits
 
@@ -75,7 +76,7 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 ## 中文速览
 
-**安装**：解压 `MarkedStick_v0.2.0.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用「竹节虫骨架」。需要 DMF 框架。
+**安装**：解压 `MarkedStick_v0.2.1.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用「竹节虫骨架」。需要 DMF 框架。
 
 **它是干什么的**：给被职业技能标记的精英与专家画一副霓虹竹节虫骨架——躯干、头颈、锁骨、双臂、双腿由小珠子串成，头/躯干/双手/双脚各一个发光点。画在 UI 层，任何轮廓都盖不住它。
 
@@ -83,4 +84,4 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 **自己与他人分开显示**：你自己标记的敌人用一套颜色（默认品红），队友标记的敌人用另一套（默认青色），两套都各自带身体色、头部色、RGB 循环与速度、霓虹强度、粗细、关节点大小、呼吸灯。判断依据是游戏自己记录的标记者，所以队友重新标记同一个敌人时颜色会立刻跟着换。不想要队友的标记就把「队友的标记」关掉。
 
-**命令**：`/stick_diag` 看状态；`/stick_rig` 导出被标记敌人身上真实的骨骼名（长输出，分批查看）——如果某个肢体没画出来，把这个输出附在反馈里即可定位。
+**命令**：`/stick_diag` 看状态；`/stick_rig` 导出被标记敌人身上真实的骨骼名（长输出，分批查看）——某个肢体没画出来就把这个输出附在反馈里；`/stick_glow` 打印上一帧霓虹光晕的实际数值（设置值、投影比例、芯与三层光晕的宽度、亮度增益），霓虹强度看着不对就附它。
