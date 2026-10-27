@@ -9,6 +9,35 @@ are archived under `build/dev/` and never shipped.
 > -- English, Simplified Chinese and Traditional Chinese now all read
 > **MarkedStick**. Nothing else in either build differs.
 
+## 1.3.0
+
+First build that acts on the measurements instead of just taking them.
+
+Measured over two matches on the same map (one with the mod on, one off): about
+**2.3 ms of frame time per skeleton**, with the mod costing nothing while no
+skeleton is up. Three marked enemies therefore cost 6-8 ms, which is the 20 fps
+that was reported.
+
+- **23 percent fewer quads per skeleton.** The two dim halo bands are drawn on
+  every second / third bead instead of on all of them. Consecutive beads sit 0.7
+  bead-widths apart while the outer band is more than six widths across, so
+  neighbours already overlap almost completely: the line is unchanged, there are
+  simply fewer squares under it. The last bead of every segment keeps the full
+  ladder so a limb does not end in a hard edge. 534 drawn squares per skeleton
+  became 409.
+- **Markers the engine is not drawing are skipped entirely** (behind the camera,
+  off screen, past `max_distance`). Nothing is on screen, so nothing has to be
+  cleared or laid out.
+- **The clock is calibrated once per session.** The engine's performance counter
+  is undocumented; its numbers looked like seconds, which is why the previous
+  report could only say "under 0.5 ms" about this mod's own share. It is now
+  measured against `os.clock` and the report states the unit it found
+  (`timer=engine 1.02e+07 units/s`), so the number is auditable rather than
+  assumed.
+- **Two-minute reports no longer reset the counters.** They were snapshots that
+  threw the past away, so the line printed on returning to the hub described only
+  the last two minutes. A session now accumulates from mission start to hub.
+
 ## 1.2.2
 
 Fixes for the report added in 1.2.1 -- the first session it logged was useless,

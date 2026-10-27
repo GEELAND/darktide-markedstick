@@ -729,7 +729,12 @@ local function print_perf(final)
 		end
 	end
 
-	StickMarker.perf_reset()
+	-- A periodic report is a snapshot of the session so far, not its end.
+	-- Resetting here is what made every two-minute window cover only the last
+	-- two minutes: the final line never described the whole match.
+	if final then
+		StickMarker.perf_reset()
+	end
 end
 
 local function perf_frame(dt)

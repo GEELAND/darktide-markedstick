@@ -721,20 +721,35 @@ end
 -- no intensity gain -- losing the filament is how a glow stops reading as a
 -- tube -- but the three halo bands do, so once the widths are maxed the
 -- slider keeps buying brightness instead of doing nothing.
-local function place_bead(style, keys, x, y, size, pads, alpha, halo_gain, palette)
+-- The two dim halo bands are drawn on every second / third bead instead of on
+-- all of them. Consecutive beads sit 0.7 bead-widths apart while the outer band
+-- is more than six widths across, so neighbours already overlap almost
+-- completely: skipping the in-between ones removes a third of the quads with no
+-- visible seam, and the last bead of a segment always draws its full ladder so
+-- the end of a limb stays soft.
+local function place_bead(style, keys, x, y, size, pads, alpha, halo_gain, palette, i, n)
 	local drew = false
+	local sparse_mid = (i % 2 == 0) and (i ~= n)
+	local sparse_out = (i % 3 ~= 1) and (i ~= n)
 
 	for l = 1, #BEAD_LAYERS do
 		local layer = BEAD_LAYERS[l]
 		local pad = 0
+		local wanted = true
 
 		if layer.pad then
 			pad = (pads and pads[layer.pad]) or 0
 		end
 
+		if layer.pad == "mid" then
+			wanted = not sparse_mid
+		elseif layer.pad == "out" then
+			wanted = not sparse_out
+		end
+
 		-- A band with no spread is not a band: at glow 0 the halo bands are
 		-- skipped entirely instead of being drawn at the core's own size.
-		if pad > 0 or layer.core then
+		if wanted and (pad > 0 or layer.core) then
 			local s = size + pad * 2
 			local lift = layer.core and 1 or halo_gain
 
@@ -799,7 +814,7 @@ local function chain(style, seg, ax, ay, bx, by, bead, pads, alpha, halo_gain, m
 	for i = 1, n do
 		local t = (i - 1) / (n - 1)
 
-		if place_bead(style, KEYS[seg][i], ax + dx * t, ay + dy * t, bead, pads, alpha, halo_gain, palette) then
+		if place_bead(style, KEYS[seg][i], ax + dx * t, ay + dy * t, bead, pads, alpha, halo_gain, palette, i, n) then
 			drew = drew + 1
 		end
 	end
@@ -1008,6 +1023,41 @@ end
 -- for a single frame.
 local hires_start, hires_since, hires_state = nil, nil, nil
 
+-- How many engine-clock units make one second. The counter is not documented in
+-- this build, and guessing its unit is exactly how "13 ms" got logged as
+-- "0.01 ms" -- twice, in opposite directions. So it is measured once, against
+-- os.clock (seconds of CPU time), with a busy loop long enough to move that
+-- clock by a few quanta.
+local clock_scale = nil
+local clock_units_per_second = nil
+
+local function calibrate()
+	local os_lib = rawget(_G, "os")
+
+	if not (os_lib and os_lib.clock) then
+		return nil
+	end
+
+	local before = os_lib.clock()
+	local c0 = hires_start()
+	local i = 0
+
+	repeat
+		i = i + 1
+	until (os_lib.clock() - before) >= 0.02 or i >= 4000000
+
+	local seconds = os_lib.clock() - before
+	local units = hires_since(c0)
+
+	if seconds <= 0 or type(units) ~= "number" or units <= 0 then
+		return nil
+	end
+
+	clock_units_per_second = units / seconds
+
+	return 1000 / clock_units_per_second
+end
+
 local function clock_ms()
 	if hires_state == nil then
 		hires_state = false
@@ -1030,7 +1080,13 @@ local function clock_ms()
 	end
 
 	if hires_state then
-		return hires_since(hires_start())
+		if clock_scale == nil then
+			-- No calibration available: assume the counter is in seconds, which
+			-- is the unit its numbers looked like.
+			clock_scale = calibrate() or 1000
+		end
+
+		return hires_since(hires_start()) * clock_scale
 	end
 
 	local os_lib = rawget(_G, "os")
@@ -1214,9 +1270,18 @@ function template.perf_report()
 
 	local avg = perf.dt_sum / perf.frames
 
+	local clock_note = "os.clock"
+
+	if hires_state then
+		if clock_units_per_second then
+			clock_note = string.format("engine %.3g units/s", clock_units_per_second)
+		else
+			clock_note = "engine (uncalibrated, assumed seconds)"
+		end
+	end
+
 	lines[1] = string.format("[perf] session: %.1f s, %d frames, avg %.2f ms (%.1f fps), max %.1f ms, timer=%s",
-		perf.dt_sum / 1000, perf.frames, avg, 1000 / avg, perf.dt_max,
-		hires_state and "engine" or "os.clock")
+		perf.dt_sum / 1000, perf.frames, avg, 1000 / avg, perf.dt_max, clock_note)
 
 	local labels = { "0", "1-2", "3-4", "5+" }
 	local parts = {}
@@ -1299,6 +1364,15 @@ end
 
 local function update_frame(parent, ui_renderer, widget, marker, template_ref, dt, t)
 	if not widget then
+		return
+	end
+
+	-- The engine calls this even for a marker it will not draw: behind the
+	-- camera, off screen, or past max_distance. Its draw flag is already computed
+	-- by the time this runs, and a marker that is not drawn has nothing on screen
+	-- to clear, so the whole frame is skipped instead of being laid out and then
+	-- thrown away.
+	if marker and marker.draw == false then
 		return
 	end
 

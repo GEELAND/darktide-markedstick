@@ -13,5 +13,5 @@ return {
 	-- tag and the release zip exactly. tools/release_check.js enforces all
 	-- three; changing one without the others is how players end up thinking
 	-- they installed the wrong file.
-	version = "1.2.2",
+	version = "1.3.0",
 }

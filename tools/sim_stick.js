@@ -1475,6 +1475,61 @@ switch_tests()
 -- are the fix, and the assertions below read the ladder off the drawn passes.
 
 local function band_tests()
+
+-- C0b-2. sparse halo bands -----------------------------------------------------
+--
+-- The two dim bands are drawn on every second / third bead instead of on all of
+-- them: consecutive beads sit 0.7 bead-widths apart while the outer band is more
+-- than six widths across, so neighbours already overlap almost completely. What
+-- has to hold is that the line stays continuous (asserted by the widths above),
+-- the pattern is exactly as described, and the last bead of a segment keeps its
+-- full ladder so a limb does not end in a hard edge.
+local function sparse_band_tests()
+	SETTINGS.stick_glow = 100
+
+	local U = mkunit("sparse", 10, ELITE)
+	local def = frame(U, 10)
+
+	local function band(seg, i, suffix)
+		local st = def.style["b" .. seg .. "_" .. i .. "_" .. suffix]
+
+		return st ~= nil and st.visible
+	end
+
+	local seg = nil
+
+	for s = 1, 14 do
+		if band(s, 6, "c") then
+			seg = s
+			break
+		end
+	end
+
+	check(seg ~= nil, "a segment long enough to show the pattern was drawn")
+
+	if seg then
+		local n = 0
+
+		for i = 1, 24 do
+			if band(seg, i, "c") then
+				n = i
+			end
+		end
+
+		check(band(seg, 1, "c") and band(seg, 1, "i") and band(seg, 1, "m") and band(seg, 1, "o"),
+			"the first bead of a segment keeps the full four-band ladder")
+		check(band(seg, 2, "c") and band(seg, 2, "i") and not band(seg, 2, "m") and not band(seg, 2, "o"),
+			"the second bead keeps the two bright bands and drops both dim ones")
+		check(band(seg, 3, "m") and not band(seg, 3, "o"),
+			"the third brings the mid band back but not the outermost")
+		check(band(seg, 4, "o") and not band(seg, 4, "m"),
+			"the fourth brings the outer band back")
+		check(n > 5 and band(seg, n, "o") and band(seg, n, "m"),
+			"and the last bead draws every band, so a limb does not end in a hard edge")
+	end
+end
+
+sparse_band_tests()
 	-- The canonical ladder is quoted at glow 100, so the measurement is taken
 	-- there rather than inheriting whatever the previous test left behind.
 	SETTINGS.stick_glow = 100
