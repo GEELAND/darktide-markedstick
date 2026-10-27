@@ -685,15 +685,68 @@ local function drop_all()
 	live = {}
 end
 
--- DMF has called this both as mod.update(dt) and mod:update(dt) depending on
--- version. Accept either shape instead of guessing.
-function mod.update(a, b)
-	local dt = type(a) == "number" and a or b
+-- ---------------------------------------------------------------------------
+-- Performance accounting
+-- ---------------------------------------------------------------------------
+-- The marker module counts; this file decides when a session starts and ends
+-- and where the report goes. It goes BOTH to chat and to the DMF log, because
+-- the log line is what survives an alt-F4, a crash or simply closing the game
+-- before anyone takes a screenshot.
 
-	if type(dt) ~= "number" then
-		dt = 0
+-- true / false / nil. nil is "cannot tell right now" -- loading, or no game mode
+-- yet. That distinction matters: reading nil as "left the mission" would end the
+-- session and reset the counters on every loading screen.
+local function mission_state()
+	local gm = Managers.state and Managers.state.game_mode
+
+	if not gm then
+		return nil
 	end
 
+	local ok, name = pcall(gm.game_mode_name, gm)
+
+	if not ok or type(name) ~= "string" then
+		return nil
+	end
+
+	return name ~= "hub"
+end
+
+local function print_perf(final)
+	local lines = StickMarker.perf_report()
+
+	-- mod.info is the log channel; a DMF build without it must not turn a
+	-- diagnostic into a per-frame error.
+	local log = mod.info and function(line) mod:info(line) end or nil
+
+	for i = 1, #lines do
+		if log then
+			log(lines[i])
+		end
+
+		if final then
+			mod:echo(lines[i])
+		end
+	end
+
+	StickMarker.perf_reset()
+end
+
+local function perf_frame(dt)
+	local count = 0
+
+	for _ in pairs(live) do
+		count = count + 1
+	end
+
+	local due = StickMarker.perf_tick(dt, count, mission_state())
+
+	if due then
+		print_perf(due == "final")
+	end
+end
+
+local function update_body(dt)
 	if not mod:get("stick_enabled") then
 		-- The master switch owns the skeletons too. Without this the markers
 		-- stayed up, frozen on their last frame, and the switch looked dead.
@@ -726,6 +779,30 @@ function mod.update(a, b)
 
 	if not ok then
 		error_count = error_count + 1
+	end
+end
+
+-- DMF has called this both as mod.update(dt) and mod:update(dt) depending on
+-- version. Accept either shape instead of guessing.
+function mod.update(a, b)
+	local dt = type(a) == "number" and a or b
+
+	if type(dt) ~= "number" then
+		dt = 0
+	end
+
+	-- Accounting runs before the early returns inside update_body: comparing
+	-- "mod on" against "mod off" within one session is the whole point, so a
+	-- switched-off mod still has to report its frames.
+	perf_frame(dt)
+
+	if StickMarker.perf_started() then
+		local t0 = StickMarker.clock_ms()
+
+		update_body(dt)
+		StickMarker.perf_scan(StickMarker.clock_ms() - t0)
+	else
+		update_body(dt)
 	end
 end
 
@@ -885,6 +962,20 @@ mod:command("stick_glow", "MarkedStick: print the glow numbers of the last drawn
 		pads and string.format("%.2f", pads.mid) or "off",
 		pads and string.format("%.2f", pads.inn) or "off"
 	))
+end)
+
+-- The numbers behind "this build costs frames". Printed on demand, and also
+-- written to the log automatically every two minutes and once when you get back
+-- to the hub, so a session does not have to end politely to be measurable.
+-- Deliberately does NOT reset: typing it mid-mission must not throw the data
+-- away. A new session starts by itself when the next mission begins.
+mod:command("stick_perf", "MarkedStick: print the frame-time statistics", function()
+	local lines = StickMarker.perf_report()
+
+	for i = 1, #lines do
+		mod:echo(lines[i])
+		mod:info(lines[i])
+	end
 end)
 
 -- Attribution, as the game reports it. `my_tags` is the number of tag ids the

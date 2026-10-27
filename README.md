@@ -16,7 +16,7 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 ## Install
 
 1. Install DMF.
-2. Unzip `MarkedStick_v1.2.0.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
+2. Unzip `MarkedStick_v1.2.1.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
 3. Enable **MarkedStick** in the in-game mod list.
 
 **The zip must be unzipped.** Dropping the archive into `mods` does nothing -- the framework only scans `.mod` files, and a zipped mod simply never appears in the list.
@@ -64,6 +64,7 @@ The joint dot size is a percentage of the line width and can never go below 180 
 | `/stick_rig` | dumps the real skeleton of a marked unit -- every bone name the game will enumerate, each joint candidate with its world position, and the breed's hit zones. Long output, 40 lines per page; run it again for the next page. |
 | `/stick_glow` | prints the numbers the last drawn frame used for the neon glow: setting, projected ratio, core and halo widths, brightness lift. Attach it if the glow slider ever looks dead. |
 | `/stick_own` | which player the game considers local, how many tag ids it says you own, and the tag id behind each live mark -- the answer to "why is my mark painted as a teammate's". |
+| `/stick_perf` | frame time bucketed by how many skeletons were on screen, how much of that frame this mod's own Lua spent, and how the cost splits between clearing the pool and drawing. The same lines go to the DMF log every two minutes and once when you return to the hub, so a slow machine can be diagnosed from the log afterwards. |
 
 `/stick_rig` is the diagnostic to attach to a bug report if a limb is missing, `/stick_glow` if the neon strength looks wrong.
 
@@ -80,7 +81,7 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 ## 中文速览
 
-**安装**：解压 `MarkedStick_v1.2.0.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用 **MarkedStick**。需要 DMF 框架。
+**安装**：解压 `MarkedStick_v1.2.1.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用 **MarkedStick**。需要 DMF 框架。
 
 **名字**：mod 列表里三语都显示 **MarkedStick**（不再随语言翻译）——它就是 mod 的标识，和文件夹名、`.mod` 文件名完全一致。
 
@@ -92,4 +93,4 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 **基石天赋标记的小兵也会画**：灵能「扰动命运」这类基石会标记血痂/渣滓小兵，而这些敌人无法手动标记，旧版会把它们整个过滤掉。现在只要带的是基石标记，不论兵种都画骨架；**你自己手动标记的小兵仍然不画**，免得满屏骨架。
 
-**命令**：`/stick_diag` 看状态；`/stick_rig` 导出被标记敌人身上真实的骨骼名（长输出，分批查看）——某个肢体没画出来就把这个输出附在反馈里；`/stick_glow` 打印上一帧霓虹光晕的实际数值（设置值、投影比例、芯与三层光晕的宽度、亮度增益），霓虹强度看着不对就附它；`/stick_own` 打印游戏认定的本地玩家、你名下有多少个标记 id、以及每个在场标记的 tag id——用来查“我的标记为什么显示成队友颜色”。
+**命令**：`/stick_diag` 看状态；`/stick_rig` 导出被标记敌人身上真实的骨骼名（长输出，分批查看）——某个肢体没画出来就把这个输出附在反馈里；`/stick_glow` 打印上一帧霓虹光晕的实际数值（设置值、投影比例、芯与三层光晕的宽度、亮度增益），霓虹强度看着不对就附它；`/stick_own` 打印游戏认定的本地玩家、你名下有多少个标记 id、以及每个在场标记的 tag id——用来查“我的标记为什么显示成队友颜色”。；`/stick_perf` 打印帧时间统计（按场上骨架数量分桶的平均帧时间、本 mod 自己占了多少、其中清池/解析关节/绘制各占几成），同样的行每两分钟和回到飞船时自动写进游戏日志，卡顿可以直接事后从日志读。

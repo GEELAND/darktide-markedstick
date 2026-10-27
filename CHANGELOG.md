@@ -9,6 +9,19 @@ are archived under `build/dev/` and never shipped.
 > -- English, Simplified Chinese and Traditional Chinese now all read
 > **MarkedStick**. Nothing else in either build differs.
 
+## 1.2.1
+
+- New `/stick_perf`, and the same report written to the DMF log every two
+  minutes and once when you get back to the hub. It answers "this build costs
+  frames" with numbers: frame time bucketed by how many skeletons were on
+  screen, this mod's own share of that frame, and how the share splits between
+  clearing the pool, resolving joints and drawing. A session can be read from
+  the log afterwards, so nothing has to be screenshotted mid-fight.
+- The accounting is always on inside a mission. It costs a handful of timer
+  reads per marker per frame -- less than one bead -- and it uses the engine's
+  performance counter when the build exposes one, reporting `timer=os.clock`
+  when it has to fall back.
+
 ## 1.2.0
 
 - The mod list shows **MarkedStick** in every language instead of

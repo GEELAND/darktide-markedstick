@@ -65,6 +65,7 @@ end
 
 local created = {}
 local echo_lines = {}
+local info_lines = {}
 local commands = {}
 
 -- The SHIPPED defaults, i.e. what a fresh install gets: breathing and the
@@ -488,6 +489,9 @@ mod_obj = {
 	end,
 	get = function(self, key) return SETTINGS[key] end,
 	echo = function(self, s) echo_lines[#echo_lines + 1] = tostring(s) end,
+	-- The DMF log channel. The perf report goes here as well as to chat, which
+	-- is what makes a session readable after the game is closed.
+	info = function(self, s) info_lines[#info_lines + 1] = tostring(s) end,
 	command = function(self, name, desc, cb) commands[name] = cb end,
 }
 
@@ -2109,6 +2113,100 @@ local function owner_tests()
 end
 
 owner_tests()
+
+-- F. the performance accounting ------------------------------------------------
+--
+-- The point of the instrumentation is to answer "what does one skeleton cost",
+-- so the checks are about the report being complete and honest: it must not
+-- divide by zero, it must bucket frame time by skeleton count, and it must reach
+-- the log (the copy that survives the game being closed) as well as chat.
+local function perf_tests()
+	-- No game mode at all (loading, main menu): nothing counted, nothing
+	-- reported, no session started.
+	Managers.state.game_mode = nil
+	keep_only({})
+	tpl.perf_reset()
+
+	local lines = tpl.perf_report()
+
+	check(#lines == 1 and string.find(lines[1], "no frames counted", 1, true) ~= nil,
+		"with no frames counted the report says so instead of dividing by zero")
+
+	local mode = { name = "coop_complete_objective" }
+
+	Managers.state.game_mode = {
+		game_mode_name = function(self) return mode.name end,
+	}
+
+	local U = mkunit("perf_u", 10, ELITE)
+	outline_system._unit_extension_data[U] = { outlines = { { name = "veteran_smart_tag" } } }
+
+	local reference = visible_beads(frame(U, 10))
+
+	for i = 1, 20 do
+		mod.update(0.016)
+	end
+
+	check(tpl.perf_started(), "entering a mission starts a session by itself")
+	check(tpl.perf_started() and visible_beads(frame(U, 10)) == reference,
+		"and the instrumentation does not change what is drawn")
+
+	for i = 1, 20 do
+		mod.update(0.016)
+		frame(U, 10)
+	end
+
+	local report = table.concat(tpl.perf_report(), " | ")
+
+	check(string.find(report, "frame time by skeletons", 1, true) ~= nil,
+		"the report buckets frame time by how many skeletons were on screen")
+	check(string.find(report, "our Lua", 1, true) ~= nil,
+		"and prints how much of the frame our own code spent")
+	check(string.find(report, "light sources drawn", 1, true) ~= nil,
+		"and how many beads were actually drawn")
+	check(string.find(report, "light sources drawn: 0/", 1, true) == nil,
+		"the bead counter is not stuck at zero while skeletons are drawing")
+
+	-- Back in the hub: the session ends and the report goes out on both
+	-- channels.
+	mode.name = "hub"
+	echo_lines = {}
+	info_lines = {}
+
+	mod.update(0.016)
+
+	check(string.find(table.concat(echo_lines, " | "), "[perf]", 1, true) ~= nil,
+		"returning to the hub prints the report to chat")
+	check(string.find(table.concat(info_lines, " | "), "[perf]", 1, true) ~= nil,
+		"and writes the same lines to the DMF log")
+	check(not tpl.perf_started(), "and closes the session")
+
+	check(string.find(tpl.perf_report()[1], "no frames counted", 1, true) ~= nil,
+		"the counters are cleared for the next mission")
+
+	-- The manual command must not throw the data away: a player types it
+	-- mid-mission precisely because something feels wrong.
+	echo_lines = {}
+	mod.update(0.016)
+	info_lines = {}
+
+	Managers.state.game_mode = {
+		game_mode_name = function(self) return mode.name end,
+	}
+	mode.name = "coop_complete_objective"
+	mod.update(0.016)
+
+	commands.stick_perf()
+
+	check(#echo_lines > 1, "the chat command prints the report on demand")
+	check(tpl.perf_started(), "and leaves the session running")
+
+	Managers.state.game_mode = nil
+	tpl.perf_reset()
+	keep_only({})
+end
+
+perf_tests()
 
 OUT.summary = table.concat(OUT.checks, "\\n")
 OUT.echo = table.concat(echo_lines, " | ")

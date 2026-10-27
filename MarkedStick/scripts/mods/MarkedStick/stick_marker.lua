@@ -994,6 +994,253 @@ local function read_side(mod, prefix, fallback_rgb)
 end
 
 -- ---------------------------------------------------------------------------
+-- Performance accounting
+-- ---------------------------------------------------------------------------
+-- "The mod costs 20 fps" cannot be acted on. Three numbers can: frame time
+-- bucketed by how many skeletons were on screen (that is the marginal cost of
+-- one skeleton, measured on the real machine), how much of the frame our own
+-- Lua spent, and which part of it. Everything below is a counter increment or a
+-- timer read, so the instrument costs less than one bead.
+--
+-- The timer is the engine's performance counter, probed once and validated the
+-- way other mods do it. If the probe fails the fallback is os.clock, which ticks
+-- in whole milliseconds in this VM: still fine for a session average, useless
+-- for a single frame.
+local hires_start, hires_since, hires_state = nil, nil, nil
+
+local function clock_ms()
+	if hires_state == nil then
+		hires_state = false
+
+		local app = rawget(_G, "Application")
+		local start = app and app.query_performance_counter
+		local since = app and app.time_since_query
+
+		if type(start) == "function" and type(since) == "function" then
+			local ok, t0 = pcall(start)
+
+			if ok and t0 ~= nil then
+				local ok2, ms = pcall(since, t0)
+
+				if ok2 and type(ms) == "number" and ms >= 0 and ms < 100 then
+					hires_start, hires_since, hires_state = start, since, true
+				end
+			end
+		end
+	end
+
+	if hires_state then
+		return hires_since(hires_start())
+	end
+
+	local os_lib = rawget(_G, "os")
+
+	if os_lib and os_lib.clock then
+		return os_lib.clock() * 1000
+	end
+
+	return 0
+end
+
+-- Four buckets by skeleton count: 0 / 1-2 / 3-4 / 5+. The gaps between them are
+-- the answer -- they are the same frame, the same level and the same GPU, with
+-- only the number of skeletons changing.
+local perf = {
+	started = false,
+	frames = 0,
+	skipped = 0,
+	dt_sum = 0,
+	dt_max = 0,
+	b_n = { 0, 0, 0, 0 },
+	b_sum = { 0, 0, 0, 0 },
+	b_max = { 0, 0, 0, 0 },
+	markers_max = 0,
+	markers_sum = 0,
+	beads_sum = 0,
+	beads_max = 0,
+	beads_frame = 0,
+	cpu_widget = 0,
+	cpu_clear = 0,
+	cpu_emit = 0,
+	cpu_scan = 0,
+	since_report = 0,
+}
+
+local function perf_reset()
+	perf.frames, perf.skipped, perf.dt_sum, perf.dt_max = 0, 0, 0, 0
+
+	for i = 1, 4 do
+		perf.b_n[i], perf.b_sum[i], perf.b_max[i] = 0, 0, 0
+	end
+
+	perf.markers_max, perf.markers_sum = 0, 0
+	perf.beads_sum, perf.beads_max, perf.beads_frame = 0, 0, 0
+	perf.cpu_widget, perf.cpu_clear, perf.cpu_emit, perf.cpu_scan = 0, 0, 0, 0
+	perf.since_report = 0
+end
+
+template.perf_reset = perf_reset
+
+template.perf_started = function()
+	return perf.started
+end
+
+template.clock_ms = clock_ms
+
+local function bucket_of(n)
+	if n <= 0 then
+		return 1
+	end
+
+	if n <= 2 then
+		return 2
+	end
+
+	if n <= 4 then
+		return 3
+	end
+
+	return 4
+end
+
+-- Called once per frame from MarkedStick.lua's update, BEFORE the mod's own
+-- early returns, so "mod switched off" is measurable as well.
+--
+-- in_mission is true / false / nil: nil means "cannot tell right now" (loading),
+-- and a frame in that state is neither counted nor treated as the end of a
+-- session.
+--
+-- Returns "report" when a periodic summary is due, "final" on the first frame
+-- back in the hub, or nil.
+function template.perf_tick(dt, markers, in_mission)
+	if in_mission == nil then
+		return nil
+	end
+
+	if not in_mission then
+		if perf.started then
+			perf.started = false
+
+			return "final"
+		end
+
+		return nil
+	end
+
+	if not perf.started then
+		perf.started = true
+		perf_reset()
+	end
+
+	if type(dt) ~= "number" or dt <= 0 or dt > 0.2 then
+		perf.skipped = perf.skipped + 1
+
+		return nil
+	end
+
+	perf.frames = perf.frames + 1
+	perf.dt_sum = perf.dt_sum + dt
+
+	if dt > perf.dt_max then
+		perf.dt_max = dt
+	end
+
+	if markers > perf.markers_max then
+		perf.markers_max = markers
+	end
+
+	perf.markers_sum = perf.markers_sum + markers
+
+	local b = bucket_of(markers)
+
+	perf.b_n[b] = perf.b_n[b] + 1
+	perf.b_sum[b] = perf.b_sum[b] + dt
+
+	if dt > perf.b_max[b] then
+		perf.b_max[b] = dt
+	end
+
+	perf.beads_sum = perf.beads_sum + perf.beads_frame
+
+	if perf.beads_frame > perf.beads_max then
+		perf.beads_max = perf.beads_frame
+	end
+
+	perf.beads_frame = 0
+	perf.since_report = perf.since_report + dt
+
+	if perf.since_report >= 120 then
+		perf.since_report = 0
+
+		return "report"
+	end
+
+	return nil
+end
+
+-- Add the cost of one whole frame of the marker module. Called by the wrapper
+-- around update_function, which is the only place that sees the total.
+function template.perf_scan(ms)
+	if perf.started and type(ms) == "number" and ms > 0 then
+		perf.cpu_scan = perf.cpu_scan + ms
+	end
+end
+
+-- The report, as log lines. Written to the DMF log by the caller so it survives
+-- a crash or an alt-F4, which is the whole reason it is not chat-only.
+function template.perf_report()
+	local lines = {}
+
+	if perf.frames == 0 then
+		lines[1] = "[perf] no frames counted yet (are you in a mission?)"
+
+		return lines
+	end
+
+	local avg = perf.dt_sum / perf.frames
+
+	lines[1] = string.format("[perf] %s: %.1f s, %d frames, avg %.2f ms (%.1f fps), max %.1f ms, timer=%s",
+		"session", perf.dt_sum, perf.frames, avg, 1000 / avg, perf.dt_max,
+		hires_state and "engine" or "os.clock")
+
+	local labels = { "0", "1-2", "3-4", "5+" }
+	local parts = {}
+
+	for i = 1, 4 do
+		if perf.b_n[i] > 0 then
+			parts[#parts + 1] = string.format("%s -> %.2f ms (n=%d)", labels[i],
+				perf.b_sum[i] / perf.b_n[i], perf.b_n[i])
+		end
+	end
+
+	lines[2] = "[perf] frame time by skeletons on screen: " .. table.concat(parts, "  |  ")
+
+	local our = perf.cpu_widget + perf.cpu_scan
+	local per_frame = our / perf.frames
+	local share = avg > 0 and (per_frame / avg) * 100 or 0
+	local avg_markers = perf.markers_sum / perf.frames
+
+	lines[3] = string.format("[perf] our Lua: %.3f ms/frame = %.1f%% of a frame at %.2f skeletons " ..
+		"(widget %.3f, scan %.3f)", per_frame, share, avg_markers,
+		perf.cpu_widget / perf.frames, perf.cpu_scan / perf.frames)
+
+	local split_total = perf.cpu_clear + perf.cpu_emit
+	local clear_pct = split_total > 0 and (perf.cpu_clear / split_total) * 100 or 0
+	local emit_pct = split_total > 0 and (perf.cpu_emit / split_total) * 100 or 0
+	local rest_pct = 100 - clear_pct - emit_pct
+
+	lines[4] = string.format("[perf] inside a widget frame: clear pool %.0f%% | %s %.0f%% | joints %.0f%%",
+		clear_pct, "draw writes", emit_pct, rest_pct)
+
+	lines[5] = string.format("[perf] light sources drawn: %.0f/frame avg, %d max (beads + joint dots), " ..
+		"%d markers max, skipped %d frames",
+		perf.beads_sum / perf.frames, perf.beads_max, perf.markers_max, perf.skipped)
+
+	return lines
+end
+
+
+-- ---------------------------------------------------------------------------
 -- Per-frame layout
 -- ---------------------------------------------------------------------------
 
@@ -1028,7 +1275,7 @@ local function frame_time(dt, t)
 	return clock
 end
 
-template.update_function = function(parent, ui_renderer, widget, marker, template_ref, dt, t)
+local function update_frame(parent, ui_renderer, widget, marker, template_ref, dt, t)
 	if not widget then
 		return
 	end
@@ -1038,7 +1285,17 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 
 	-- Empty first, ask questions later. Every early exit below then leaves
 	-- nothing on screen instead of leaving the last good frame's beads.
-	clear_pool(style)
+	local account = perf.started
+
+	if account then
+		local c0 = clock_ms()
+
+		clear_pool(style)
+
+		perf.cpu_clear = perf.cpu_clear + (clock_ms() - c0)
+	else
+		clear_pool(style)
+	end
 
 	if not content then
 		return
@@ -1250,6 +1507,9 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 	-- them is a breath that has faded them below one alpha step -- which the
 	-- depth ceiling already makes impossible, and which is still cheaper to
 	-- test than to draw.
+	local draw_t0 = account and clock_ms() or 0
+	local beads = 0
+
 	if breath * NEON_ALPHA.core >= 1 then
 		for s = 1, #SEGMENTS do
 			local seg = SEGMENTS[s]
@@ -1262,7 +1522,10 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 					-- else with the body colour.
 					local tint = (seg.group == "head") and head_palette or palette
 
-					if chain(style, s, a.x, a.y, b.x, b.y, bead, pads, breath, halo_gain, max_beads, tint) > 0 then
+					local drew = chain(style, s, a.x, a.y, b.x, b.y, bead, pads, breath, halo_gain, max_beads, tint)
+
+					if drew > 0 then
+						beads = beads + drew
 						content["show_" .. seg.group] = true
 					end
 				end
@@ -1282,9 +1545,15 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 			local tint = (def.group == "head") and head_palette or palette
 
 			if place_dot(style, def.key, j.x, j.y, dot, breath, halo_gain, tint) then
+				beads = beads + 1
 				content["show_" .. def.group] = true
 			end
 		end
+	end
+
+	if account then
+		perf.cpu_emit = perf.cpu_emit + (clock_ms() - draw_t0)
+		perf.beads_frame = perf.beads_frame + beads
 	end
 
 	-- Distance under the figure. The engine already measured it; the fallback
@@ -1341,6 +1610,23 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 	LAST.gain = halo_gain
 	LAST.own = own
 	LAST.dist = dist
+end
+
+-- The engine calls this. It is a wrapper only so that the cost of one whole
+-- marker frame can be measured in one place: the timers inside cover the pool
+-- clear and the drawing, and everything between them -- settings, joint
+-- resolution, projection -- is what cannot be wrapped section by section
+-- without a timer read at every early return.
+template.update_function = function(parent, ui_renderer, widget, marker, template_ref, dt, t)
+	if not perf.started then
+		return update_frame(parent, ui_renderer, widget, marker, template_ref, dt, t)
+	end
+
+	local t0 = clock_ms()
+
+	update_frame(parent, ui_renderer, widget, marker, template_ref, dt, t)
+
+	perf.cpu_widget = perf.cpu_widget + (clock_ms() - t0)
 end
 
 -- Read by /stick_glow in MarkedStick.lua.
