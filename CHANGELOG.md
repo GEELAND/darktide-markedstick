@@ -9,6 +9,36 @@ are archived under `build/dev/` and never shipped.
 > -- English, Simplified Chinese and Traditional Chinese now all read
 > **MarkedStick**. Nothing else in either build differs.
 
+## 1.2.0 (re-release)
+
+The shipped number goes back to **1.2.0** by decision: this build folds the whole
+internal line (1.2.x through 1.4.0) into one numbered release, so the number
+players see is the agreed one instead of the last internal iteration. The entries
+below still happened; the numbers above 1.2.0 will not ship again.
+
+- **The keystone set's colour cycle now ships off.** The two tag-driven sets still
+  cycle; the third one does not. A keystone can hold several bodies at once, and
+  those are bodies the player is already watching, so a second moving colour on
+  the same screen buys nothing and costs legibility. Switching it on behaves
+  exactly like the other two: own start point, own speed, no cross-talk.
+- **The keystone cycle rows now read like the other two sets.** Same sentence
+  structure with "keystone" as the only subject. The mixed `(% of 9 s per lap)`
+  that was sitting inside the Chinese speed title is gone. No setting id was
+  renamed, so saved choices still apply.
+- **The performance log now ships off, behind `/stick_log`.** Earlier builds wrote
+  a perf report to `console_logs` on their own, every two minutes and once on
+  returning to the hub. That is a fair price while something is being diagnosed
+  and pure overhead otherwise, so the whole instrument -- sessions, counters, the
+  two engine timer reads per widget frame, the per-frame walk of the marked list
+  and the log writes -- is now gated by one switch that starts off and lasts for
+  the session. Switching it off closes the open session too, otherwise "off" would
+  stop the reporting and keep the cost. `/stick_perf` still prints on demand once
+  the switch is on, and writes nothing at all when it is not.
+- Everything from the internal 1.3.0 / 1.4.0 line is in this build: the keystone
+  set as a third complete set of settings, the four halo bands back on every bead
+  (the sparse version measured as no saving at all), and the self-measuring perf
+  report.
+
 ## 1.4.0
 
 - **Keystone marks are their own set.** The psyker keystone's marks are not tags

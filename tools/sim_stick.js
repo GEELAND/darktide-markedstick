@@ -105,7 +105,7 @@ SETTINGS = {
 	stick_keystone_enabled = true,
 	stick_keystone_color = { 255, 255, 196, 64 },
 	stick_keystone_head_color = { 255, 255, 196, 64 },
-	stick_keystone_rgb = true,
+	stick_keystone_rgb = false,
 	stick_keystone_rgb_speed = 100,
 	stick_keystone_breath = true,
 	stick_keystone_breath_depth = 40,
@@ -2181,6 +2181,57 @@ end
 
 owner_tests()
 
+-- E2. the keystone set ships still ---------------------------------------------
+--
+-- The two tag-driven sets ship with their colour cycle running; the keystone
+-- set does not. It is the only set that can hold several bodies at once, and
+-- those are bodies the player is already watching, so a second moving colour on
+-- the same screen buys nothing and costs legibility. Pinned as behaviour, not
+-- just as a default value, because "off" in the menu is one word away from
+-- silently flipping back, and the menu table alone would not notice the marker
+-- still cycling.
+local function keystone_still_tests()
+	keep_only({})
+	reset_tags()
+
+	SETTINGS.stick_keystone_enabled = true
+	SETTINGS.stick_keystone_rgb = false
+	SETTINGS.stick_rgb = true
+	SETTINGS.stick_other_rgb = true
+
+	local key = mkunit("key_still", 14, ELITE)
+
+	outline_system._unit_extension_data[key] = { outlines = { { name = "psyker_marked_target" } } }
+
+	mod.update(0.3)
+
+	check(has_marker(key), "a keystone mark still gets a skeleton with the cycle switched off")
+
+	local still_1 = body_rgb(draw(key, 0))
+	local still_2 = body_rgb(draw(key, 3.0))
+
+	check(same_colour(still_1, still_2),
+		"with the cycle off the keystone set holds one colour over three seconds")
+	check(same_colour(still_1, SETTINGS.stick_keystone_color),
+		"and that colour is exactly the amber picked in the menu")
+
+	-- The switch has to work in the other direction too: on means drifting, the
+	-- same as the other two sets, not just "less frozen".
+	SETTINGS.stick_keystone_rgb = true
+
+	local lit_1 = body_rgb(draw(key, 3.0))
+	local lit_2 = body_rgb(draw(key, 6.0))
+
+	check(not same_colour(lit_1, lit_2),
+		"turning the keystone cycle on makes the same mark drift like the other two sets")
+
+	SETTINGS.stick_keystone_rgb = false
+	reset_tags()
+	keep_only({})
+end
+
+keystone_still_tests()
+
 -- F. the performance accounting ------------------------------------------------
 --
 -- The point of the instrumentation is to answer "what does one skeleton cost",
@@ -2188,16 +2239,23 @@ owner_tests()
 -- divide by zero, it must bucket frame time by skeleton count, and it must reach
 -- the log (the copy that survives the game being closed) as well as chat.
 local function perf_tests()
+	-- The shipped state first: the instrument is off, and off has to mean off.
+	-- A release that keeps measuring costs two engine timer reads per widget
+	-- frame plus a walk of the marked list every frame, for a report nobody
+	-- asked for -- so the default is checked before anything else.
+	check(not tpl.perf_enabled(), "the mod ships with performance logging switched off")
+	check(not tpl.perf_started(), "so no session is running before anyone asks for one")
+
+	local off_lines = tpl.perf_report()
+
+	check(#off_lines == 1 and string.find(off_lines[1], "logging is off", 1, true) ~= nil,
+		"and the report says the instrument is off, not 'nothing counted yet'")
+
 	-- No game mode at all (loading, main menu): nothing counted, nothing
 	-- reported, no session started.
 	Managers.state.game_mode = nil
 	keep_only({})
 	tpl.perf_reset()
-
-	local lines = tpl.perf_report()
-
-	check(#lines == 1 and string.find(lines[1], "no frames counted", 1, true) ~= nil,
-		"with no frames counted the report says so instead of dividing by zero")
 
 	local mode = { name = "coop_complete_objective" }
 
@@ -2214,7 +2272,27 @@ local function perf_tests()
 		mod.update(0.016)
 	end
 
-	check(tpl.perf_started(), "entering a mission starts a session by itself")
+	check(not tpl.perf_started(), "a mission in progress starts no session while the switch is off")
+
+	-- /stick_log borrows the instrument for the session.
+	echo_lines = {}
+	commands.stick_log()
+
+	check(tpl.perf_enabled(), "/stick_log switches the logging on")
+	check(string.find(table.concat(echo_lines, " | "), "logging ON", 1, true) ~= nil,
+		"and says so in chat")
+	check(not tpl.perf_started(), "the session itself only opens on the next mission frame")
+
+	local empty_lines = tpl.perf_report()
+
+	check(#empty_lines == 1 and string.find(empty_lines[1], "no frames counted", 1, true) ~= nil,
+		"with no frames counted the report says so instead of dividing by zero")
+
+	for i = 1, 20 do
+		mod.update(0.016)
+	end
+
+	check(tpl.perf_started(), "entering a mission starts a session by itself once logging is on")
 	check(tpl.perf_started() and visible_beads(frame(U, 10)) == reference,
 		"and the instrumentation does not change what is drawn")
 
@@ -2274,6 +2352,25 @@ local function perf_tests()
 
 	check(#echo_lines > 1, "the chat command prints the report on demand")
 	check(tpl.perf_started(), "and leaves the session running")
+
+	-- And the switch has to take it all down again: counters stop, the open
+	-- session closes with them, and the log file stops being written at all.
+	echo_lines = {}
+	commands.stick_log()
+
+	check(not tpl.perf_enabled(), "/stick_log switches the logging back off")
+	check(not tpl.perf_started(), "and closes the session, so no timer read is left running")
+	check(string.find(table.concat(echo_lines, " | "), "logging OFF", 1, true) ~= nil,
+		"and says so in chat")
+
+	info_lines = {}
+	echo_lines = {}
+
+	commands.stick_perf()
+
+	check(#info_lines == 0, "with logging off /stick_perf writes nothing to the log file")
+	check(string.find(table.concat(echo_lines, " | "), "logging is off", 1, true) ~= nil,
+		"and tells the player how to switch it on instead")
 
 	Managers.state.game_mode = nil
 	tpl.perf_reset()
@@ -2558,7 +2655,7 @@ local expected = {
 	{ id = "stick_keystone_enabled", type = "checkbox", default = true },
 	{ id = "stick_keystone_color",   type = "color" },
 	{ id = "stick_keystone_head_color", type = "color" },
-	{ id = "stick_keystone_rgb",     type = "checkbox", default = true },
+	{ id = "stick_keystone_rgb",     type = "checkbox", default = false },
 	{ id = "stick_keystone_rgb_speed", type = "numeric", default = 100, range = { 10, 300 } },
 	{ id = "stick_keystone_breath",  type = "checkbox", default = true },
 	{ id = "stick_keystone_breath_depth", type = "numeric", default = 40, range = { 0, 80 } },
@@ -2753,6 +2850,7 @@ rline(mainText.includes('mod:command("stick_rig"') && mainText.includes('mod:com
   "both chat commands exist under their own names");
 rline(mainText.includes('mod:command("stick_glow"'), "the glow probe command exists as well");
 rline(mainText.includes('mod:command("stick_own"'), "and so does the attribution probe");
+rline(mainText.includes('mod:command("stick_log"'), "and the switch that owns the performance log");
 rline(markerText.includes("template.last = LAST"),
   "the marker exposes the last frame's numbers for /stick_glow");
 

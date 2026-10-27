@@ -59,7 +59,9 @@
 	DISCIPLINE
 	  * every Unit.* call is pcall'd -- Stingray throws on a destroyed unit, and
 	    one unguarded call aborts the whole frame, every frame;
-	  * nothing is printed automatically, ever; diagnostics are chat commands;
+	  * nothing is printed automatically in normal play: diagnostics are chat
+	    commands, and the one thing that does write by itself -- the performance
+	    report -- is behind /stick_log and starts switched off;
 	  * the expensive scan is throttled; only the cheap validity check runs
 	    every frame, and it degrades silently when the outline system or the
 	    HUD is not up yet.
@@ -779,6 +781,15 @@ local function print_perf(final)
 end
 
 local function perf_frame(dt)
+	-- The instrument is off unless /stick_log borrowed it for this session.
+	-- Returning before the walk of `live` matters: on a horde map that table is
+	-- the longest one in the mod, and counting it once a frame for a report
+	-- nobody asked for is exactly the kind of overhead a release should not
+	-- carry.
+	if not StickMarker.perf_enabled() then
+		return
+	end
+
 	local count = 0
 
 	for _ in pairs(live) do
@@ -982,6 +993,13 @@ mod:command("stick_diag", "MarkedStick: print the current state", function()
 	))
 
 	mod:echo("layers: " .. (#names > 0 and table.concat(names, ", ") or "none"))
+
+	-- One line for the instrument's own state: "is anything being written to my
+	-- log right now" is exactly the question /stick_diag gets asked after a
+	-- release that stopped writing by itself.
+	mod:echo("logging: " .. (StickMarker.perf_enabled()
+		and "on -- /stick_perf prints on demand, /stick_log switches it off"
+		or "off -- /stick_log switches it on for this session"))
 end)
 
 -- The glow knob, as the last drawn frame saw it. Two chat lines, because
@@ -1016,12 +1034,45 @@ mod:command("stick_glow", "MarkedStick: print the glow numbers of the last drawn
 	))
 end)
 
--- The numbers behind "this build costs frames". Printed on demand, and also
--- written to the log automatically every two minutes and once when you get back
--- to the hub, so a session does not have to end politely to be measurable.
+-- The switch for the whole instrument. OFF by default and not remembered
+-- between sessions: a released mod should not be writing to anybody's log
+-- unless they asked for it in this session.
+--
+-- Why a chat command and not a fortieth menu row: the menu is a list of things
+-- that change how the mod LOOKS, and this changes what the mod MEASURES. It is
+-- also the kind of switch a player flips while looking at the frame counter,
+-- not while reading a settings page.
+--
+-- Toggling it off mid-mission closes the open session as well, so the timer
+-- reads stop with the reporting rather than outliving it.
+mod:command("stick_log", "MarkedStick: switch the performance log on or off (default off)", function()
+	local on = StickMarker.perf_set_enabled(not StickMarker.perf_enabled())
+
+	if on then
+		mod:echo("stick_log: performance logging ON -- counters start with this frame, " ..
+			"writes to the log every two minutes and on return to the hub")
+		mod:echo("stick_log: /stick_perf prints on demand; run /stick_log again to switch it off")
+	else
+		mod:echo("stick_log: performance logging OFF -- no counters, no timer reads, nothing written")
+	end
+end)
+
+-- The numbers behind "this build costs frames". Printed on demand, and -- while
+-- /stick_log is on -- written to the log automatically every two minutes and
+-- once when you get back to the hub, so a session does not have to end politely
+-- to be measurable.
 -- Deliberately does NOT reset: typing it mid-mission must not throw the data
 -- away. A new session starts by itself when the next mission begins.
 mod:command("stick_perf", "MarkedStick: print the frame-time statistics", function()
+	-- When the switch is off this must not write anything to the log file
+	-- either: "off" means the mod does not touch the log, not "it only writes
+	-- the little lines".
+	if not StickMarker.perf_enabled() then
+		mod:echo("stick_perf: logging is off -- run /stick_log to switch it on, then play a match")
+
+		return
+	end
+
 	local lines = StickMarker.perf_report()
 
 	for i = 1, #lines do

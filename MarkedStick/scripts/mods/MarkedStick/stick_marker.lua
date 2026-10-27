@@ -123,6 +123,13 @@ local SIDE_RGB = { own = DEFAULT_RGB, other = OTHER_RGB, keystone = KEYSTONE_RGB
 local SIDE_PREFIX = { own = "stick_", other = "stick_other_", keystone = "stick_keystone_" }
 local SIDES = { "own", "other", "keystone" }
 
+-- What the colour cycle falls back to when a set has no saved value at all.
+-- The two tag-driven sets ship cycling, the keystone set ships still: it can
+-- hold several bodies at once, so amber that holds still reads better than a
+-- second, faster-moving colour on the same screen. Kept next to the settings
+-- prefix so a missing read can never silently contradict the menu default.
+local SIDE_RGB_FLAG = { own = true, other = true, keystone = false }
+
 -- The distance readout keeps the game's own gold: it is a number, not a light.
 local LABEL = { 255, 255, 205, 105 }
 local SHADOW = { 190, 0, 0, 0 }
@@ -1008,12 +1015,12 @@ end
 -- density and the distance readout describe the FIGURE, and a skeleton that
 -- loses its legs because somebody else did the tagging would be surprising.
 -- ---------------------------------------------------------------------------
-local function read_side(mod, prefix, fallback_rgb)
+local function read_side(mod, prefix, fallback_rgb, fallback_rgb_flag)
 	local cfg = {}
 
 	cfg.color = get_rgb(mod, prefix .. "color", fallback_rgb)
 	cfg.head = get_rgb(mod, prefix .. "head_color", cfg.color)
-	cfg.rgb = get_flag(mod, prefix .. "rgb", true)
+	cfg.rgb = get_flag(mod, prefix .. "rgb", fallback_rgb_flag ~= false)
 	cfg.rgb_speed = get_number(mod, prefix .. "rgb_speed", 100, 10, 300) / 100
 	cfg.breath = get_flag(mod, prefix .. "breath", true)
 	cfg.breath_low = 1 - get_number(mod, prefix .. "breath_depth", BREATH_DEPTH_PCT, 0, BREATH_DEPTH_MAX) / 100
@@ -1118,7 +1125,15 @@ end
 -- Four buckets by skeleton count: 0 / 1-2 / 3-4 / 5+. The gaps between them are
 -- the answer -- they are the same frame, the same level and the same GPU, with
 -- only the number of skeletons changing.
+--
+-- `enabled` is the master switch and it ships OFF. Measuring is not free: two
+-- engine timer reads per widget frame, one per mod frame, a walk of the marked
+-- list, and a message written to the log file every two minutes. That is a fair
+-- price for a session someone is diagnosing and pure overhead for a session
+-- someone is playing, so the release carries the instrument switched off and
+-- /stick_log borrows it for one session.
 local perf = {
+	enabled = false,
 	started = false,
 	frames = 0,
 	skipped = 0,
@@ -1159,7 +1174,26 @@ end
 template.perf_reset = perf_reset
 
 template.perf_started = function()
-	return perf.started
+	return perf.enabled and perf.started
+end
+
+-- The switch behind /stick_log. Turning it off has to do two things, not one:
+-- stop counting AND close the session, because a session left open would keep
+-- update_function wrapping every frame in two timer reads -- the instrument
+-- would go on costing the frame it is no longer reporting on.
+template.perf_set_enabled = function(on)
+	perf.enabled = on and true or false
+
+	if not perf.enabled then
+		perf.started = false
+		perf_reset()
+	end
+
+	return perf.enabled
+end
+
+template.perf_enabled = function()
+	return perf.enabled
 end
 
 template.clock_ms = clock_ms
@@ -1190,6 +1224,15 @@ end
 -- Returns "report" when a periodic summary is due, "final" on the first frame
 -- back in the hub, or nil.
 function template.perf_tick(dt, markers, in_mission)
+	-- Switched off: no session opens, no frame is counted, nothing can come due.
+	-- Checked here rather than only in the caller so that every path into the
+	-- instrument is closed, not just the one frame loop we remember.
+	if not perf.enabled then
+		perf.started = false
+
+		return nil
+	end
+
 	if in_mission == nil then
 		return nil
 	end
@@ -1278,6 +1321,15 @@ end
 -- a crash or an alt-F4, which is the whole reason it is not chat-only.
 function template.perf_report()
 	local lines = {}
+
+	-- "Nothing counted" and "not counting on purpose" are different answers, and
+	-- the second one has to say how to change it -- otherwise the empty report
+	-- reads like the mod is broken.
+	if not perf.enabled then
+		lines[1] = "[perf] logging is off (run /stick_log to switch it on)"
+
+		return lines
+	end
 
 	if perf.frames == 0 then
 		lines[1] = "[perf] no frames counted yet (are you in a mission?)"
@@ -1466,7 +1518,7 @@ local function update_frame(parent, ui_renderer, widget, marker, template_ref, d
 		show.legs = get_flag(mod, "stick_show_legs", true)
 		show_distance = get_flag(mod, "stick_show_distance", true)
 		max_beads = get_number(mod, "stick_density", BEAD_MAX, 4, BEAD_MAX)
-		cfg = read_side(mod, SIDE_PREFIX[side] or "stick_", side_rgb)
+		cfg = read_side(mod, SIDE_PREFIX[side] or "stick_", side_rgb, SIDE_RGB_FLAG[side])
 	end
 
 	if not (show.head or show.torso or show.arms or show.legs) then

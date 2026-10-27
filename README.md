@@ -16,7 +16,7 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 ## Install
 
 1. Install DMF.
-2. Unzip `MarkedStick_v1.2.1.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
+2. Unzip `MarkedStick_v1.2.0.zip` into your `mods` folder. You should end up with `mods/MarkedStick/MarkedStick.mod`.
 3. Enable **MarkedStick** in the in-game mod list.
 
 **The zip must be unzipped.** Dropping the archive into `mods` does nothing -- the framework only scans `.mod` files, and a zipped mod simply never appears in the list.
@@ -53,7 +53,7 @@ Range never takes the lines away. The chains and the joint dots are drawn at eve
 | Teammates' thickness / glow / joint size | 8 / 50 / 150 | same weight as yours; their joints sit on the 180 % floor |
 | Keystone marks | on | draw enemies your keystone talent marked by itself. Off hides them entirely |
 | Keystone colour / head colour | amber | the third set, independent of the other two |
-| Keystone cycle / speed | on / 100 | its own clock, so it never drags the other two sets |
+| Keystone cycle / speed | off / 100 | ships still: a keystone can hold several bodies at once. Switch it on and it cycles like the other two, on its own clock |
 | Keystone breathing / depth / speed | on / 40 / 300 | independent of the other two sets |
 | Keystone thickness / glow / joint size | 6 / 50 / 150 | a touch thinner than yours, so your own marks stay the loudest |
 | Beads per segment | 24 | ceiling, 2-24. Bites up close only. Also the performance lever |
@@ -69,7 +69,8 @@ The joint dot size is a percentage of the line width and can never go below 180 
 | `/stick_rig` | dumps the real skeleton of a marked unit -- every bone name the game will enumerate, each joint candidate with its world position, and the breed's hit zones. Long output, 40 lines per page; run it again for the next page. |
 | `/stick_glow` | prints the numbers the last drawn frame used for the neon glow: setting, projected ratio, core and halo widths, brightness lift. Attach it if the glow slider ever looks dead. |
 | `/stick_own` | which player the game considers local, how many tag ids it says you own, and the tag id behind each live mark -- the answer to "why is my mark painted as a teammate's". |
-| `/stick_perf` | frame time bucketed by how many skeletons were on screen, how much of that frame this mod's own Lua spent, and how the cost splits between clearing the pool and drawing. The same lines go to the DMF log every two minutes and once when you return to the hub, so a slow machine can be diagnosed from the log afterwards. |
+| `/stick_log` | switches the performance log on or off for this session. **Off by default**: the release carries no counters and writes nothing to the log unless you ask. |
+| `/stick_perf` | frame time bucketed by how many skeletons were on screen, how much of that frame this mod's own Lua spent, and how the cost splits between clearing the pool and drawing. Needs `/stick_log` on first; while it is on, the same lines also go to the DMF log every two minutes and once when you return to the hub. |
 
 `/stick_rig` is the diagnostic to attach to a bug report if a limb is missing, `/stick_glow` if the neon strength looks wrong.
 
@@ -86,16 +87,16 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 ## 中文速览
 
-**安装**：解压 `MarkedStick_v1.2.1.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用 **MarkedStick**。需要 DMF 框架。
+**安装**：解压 `MarkedStick_v1.2.0.zip` 到 `mods` 目录（必须解压，zip 直接丢进去不会出现在列表里），得到 `mods/MarkedStick/MarkedStick.mod`，然后在 mod 列表里启用 **MarkedStick**。需要 DMF 框架。
 
 **名字**：mod 列表里三语都显示 **MarkedStick**（不再随语言翻译）——它就是 mod 的标识，和文件夹名、`.mod` 文件名完全一致。
 
 **它是干什么的**：给被职业技能标记的精英与专家画一副霓虹竹节虫骨架——躯干、头颈、锁骨、双臂、双腿由小珠子串成，头/躯干/双手/双脚各一个发光点。画在 UI 层，任何轮廓都盖不住它。
 
-**默认外观**（1.1.0 定版）：粗细 8、霓虹强度 50、关节点 200、每段珠子 24、呼吸开启（强度 40、速度 300）、RGB 循环开启；队友那套默认同粗细、关节点 150、青色调。全部 28 项设置都可在菜单里改。
+**默认外观**（1.1.0 定版）：粗细 8、霓虹强度 50、关节点 200、每段珠子 24、呼吸开启（强度 40、速度 300）、RGB 循环开启；队友那套默认同粗细、关节点 150、青色调。全部 39 项设置都可在菜单里改。
 
 **三类标记、三套颜色**：你自己标记的敌人用一套（默认品红），队友标记的用另一套（默认青色），**基石天赋自己标的用第三套（默认琥珀色）**。三套都各自带身体色、头部色、RGB 循环与速度、霓虹强度、粗细、关节点大小、呼吸灯，互不干扰。判断依据是游戏自己记录的标记者。**你标记的敌人即使之后被队友重新标记，也保持你的颜色**（引擎里一个目标只持一个标记，队友覆盖后 tag 归他，但骨架不会在你眼前换主人）；反过来，本来只有队友标记的敌人，你一标记就变成你的。不想要队友的标记就把「队友的标记」关掉。
 
 **基石天赋标记的小兵也会画**：灵能「扰动命运」这类基石会标记血痂/渣滓小兵，而这些敌人无法手动标记，旧版会把它们整个过滤掉。现在只要带的是基石标记，不论兵种都画骨架；**你自己手动标记的小兵仍然不画**，免得满屏骨架。
 
-**命令**：`/stick_diag` 看状态；`/stick_rig` 导出被标记敌人身上真实的骨骼名（长输出，分批查看）——某个肢体没画出来就把这个输出附在反馈里；`/stick_glow` 打印上一帧霓虹光晕的实际数值（设置值、投影比例、芯与三层光晕的宽度、亮度增益），霓虹强度看着不对就附它；`/stick_own` 打印游戏认定的本地玩家、你名下有多少个标记 id、以及每个在场标记的 tag id——用来查“我的标记为什么显示成队友颜色”。；`/stick_perf` 打印帧时间统计（按场上骨架数量分桶的平均帧时间、本 mod 自己占了多少、其中清池/解析关节/绘制各占几成），同样的行每两分钟和回到飞船时自动写进游戏日志，卡顿可以直接事后从日志读。
+**命令**：`/stick_diag` 看状态；`/stick_rig` 导出被标记敌人身上真实的骨骼名（长输出，分批查看）——某个肢体没画出来就把这个输出附在反馈里；`/stick_glow` 打印上一帧霓虹光晕的实际数值（设置值、投影比例、芯与三层光晕的宽度、亮度增益），霓虹强度看着不对就附它；`/stick_own` 打印游戏认定的本地玩家、你名下有多少个标记 id、以及每个在场标记的 tag id——用来查“我的标记为什么显示成队友颜色”。；`/stick_log` 打开/关闭性能日志（**默认关闭**：关着的时候不计数、不读计时器、也完全不写游戏日志）；`/stick_perf` 打印帧时间统计（按场上骨架数量分桶的平均帧时间、本 mod 自己占了多少、其中清池/解析关节/绘制各占几成），需要先 `/stick_log` 打开，打开后同样的行每两分钟和回到飞船时也会写进游戏日志，卡顿可以直接事后从日志读。

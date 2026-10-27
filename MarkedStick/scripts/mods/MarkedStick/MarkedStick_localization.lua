@@ -221,19 +221,19 @@ return {
 		["zh-tw"] = "基石標記的 RGB 循環",
 	},
 	stick_keystone_rgb_description = {
-		en = "Drifts the hue of the keystone set around the wheel, starting from the colour picked above. Runs on its own clock, so it does not drag the other two sets with it.",
-		["zh-cn"] = "让基石标记那一套的色相绕环漂移，起点是上面选的颜色。它走自己的时钟，不会带动另外两套。",
-		["zh-tw"] = "讓基石標記那一套的色相繞環漂移，起點是上面選的顏色。它走自己的時鐘，不會帶動另外兩套。",
+		en = "Drift the keystone set's hue around the colour wheel, with its own starting point and speed, independent of the other two sets.",
+		["zh-cn"] = "让基石标记的颜色绕色环漂移，有自己的起点与速度，与另外两套互不影响。",
+		["zh-tw"] = "讓基石標記的顏色繞色環漂移，有自己的起點與速度，與另外兩套互不影響。",
 	},
 	stick_keystone_rgb_speed_title = {
-		en = "Keystone cycle speed (%% of 9 s per lap)",
-		["zh-cn"] = "基石 RGB 速度（%% of 9 秒一圈）",
-		["zh-tw"] = "基石 RGB 速度（%% of 9 秒一圈）",
+		en = "Keystone cycle speed",
+		["zh-cn"] = "基石标记的循环速度",
+		["zh-tw"] = "基石標記的循環速度",
 	},
 	stick_keystone_rgb_speed_description = {
-		en = "How fast the keystone set's hue travels. 100 is one lap every nine seconds.",
-		["zh-cn"] = "基石那一套的色相移动多快。100 表示九秒一圈。",
-		["zh-tw"] = "基石那一套的色相移動多快。100 表示九秒一圈。",
+		en = "How fast the keystone set's hue drifts. Independent of the other two sets.",
+		["zh-cn"] = "基石标记的颜色漂移得多快。与另外两套互不影响。",
+		["zh-tw"] = "基石標記的顏色漂移得多快。與另外兩套互不影響。",
 	},
 	stick_keystone_breath_title = {
 		en = "Keystone breathing",

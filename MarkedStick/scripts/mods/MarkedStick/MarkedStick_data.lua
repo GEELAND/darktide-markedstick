@@ -276,11 +276,15 @@ return {
 			has_alpha = false,
 			},
 			{
+			-- Off by default, unlike the other two sets: a keystone can hold
+			-- several bodies at once, and those bodies are the ones players
+			-- keep their eyes on. The set is meant to be a calm, readable
+			-- amber first; anyone who wants it to cycle turns it on.
 			setting_id = "stick_keystone_rgb",
 			type = "checkbox",
 			title = "stick_keystone_rgb_title",
 			tooltip = "stick_keystone_rgb_description",
-			default_value = true,
+			default_value = false,
 			},
 			{
 			setting_id = "stick_keystone_rgb_speed",
