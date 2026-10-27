@@ -114,6 +114,9 @@ local dropped = 0
 -- that set off. Counted so /stick_diag can tell "nothing to show" apart from
 -- "filtered on purpose".
 local other_hidden = 0
+-- Same idea for the keystone set: marks the talent put there that were not
+-- drawn because that set is switched off.
+local keystone_hidden = 0
 -- Whether the previous frame was actually drawing. Drives the one-shot teardown
 -- when the master switch goes off.
 local running = false
@@ -336,20 +339,33 @@ local function tag_owner(unit)
 	return false
 end
 
+-- Which colour set a mark belongs to: "own", "other" or "keystone".
+--
+-- A keystone mark is the talent's own bookkeeping rather than a tag -- the
+-- psyker keystone also lands on scabs and dregs, which cannot be tagged by hand
+-- at all -- so it is a third category with its own set, exactly like the split
+-- between the player's marks and a teammate's. The one thing that outranks it
+-- is the player hand-tagging the same enemy afterwards, because that is a
+-- deliberate act and it should look like one.
+--
 -- Sticky by design: a frame in which the tag cannot be attributed keeps the
 -- previous verdict instead of repainting the skeleton a different colour.
-local function own_mark(unit, previous)
+local function side_of(mark_name, unit, previous)
+	if mark_name and KEYSTONE_MARKS[mark_name] then
+		if tag_owner(unit) == true then
+			return "own"
+		end
+
+		return "keystone"
+	end
+
 	local verdict = tag_owner(unit)
 
 	if verdict == nil then
-		if previous ~= nil then
-			return previous
-		end
-
-		return true
+		return previous or "own"
 	end
 
-	return verdict
+	return verdict and "own" or "other"
 end
 
 -- Only elites and specials get skeletons: a marked poxwalker is not worth a
@@ -499,11 +515,24 @@ local function others_enabled()
 	return value ~= false
 end
 
+-- The keystone set has the same switch for the same reason: a psyker who wants
+-- only the enemies they marked themselves can turn the talent's marks off
+-- without touching the colour set.
+local function keystone_enabled()
+	local ok, value = pcall(mod.get, mod, "stick_keystone_enabled")
+
+	if not ok then
+		return true
+	end
+
+	return value ~= false
+end
+
 -- Ownership can change while a skeleton is already up: the instant another
 -- player re-tags the same enemy, the tag on that body stops being ours. It is
 -- one table lookup and one assignment, so it rides the same per-frame pass
 -- that decides whether the marker belongs on screen at all.
-local function refresh_owner(unit)
+local function refresh_side(unit)
 	local record = live[unit]
 
 	if not record then
@@ -519,16 +548,18 @@ local function refresh_owner(unit)
 	-- moves in one direction while the marker is alive: an enemy never stops
 	-- being mine. A body that was somebody else's all along can still become
 	-- mine the moment the player tags it.
-	if record.own then
+	if record.side == "own" then
 		return
 	end
 
-	if tag_owner(unit) ~= true then
+	local next_side = side_of(record.name, unit, record.side)
+
+	if next_side == record.side then
 		return
 	end
 
-	record.own = true
-	StickMarker.set_own(unit, true)
+	record.side = next_side
+	StickMarker.set_side(unit, next_side)
 end
 
 -- Everything that has to be true for a skeleton to stay on screen.
@@ -562,6 +593,7 @@ local function enforce()
 	-- to take the skeletons that are already on screen with it, not wait for
 	-- the affected enemy to be re-tagged.
 	local keep_others = others_enabled()
+	local keep_keystone = keystone_enabled()
 
 	for unit in pairs(live) do
 		count = count + 1
@@ -579,12 +611,16 @@ local function enforce()
 			drop_unit(event_manager, unit)
 			dropped = dropped + 1
 		else
-			pcall(refresh_owner, unit)
+			pcall(refresh_side, unit)
 
 			local record = live[unit]
 
-			if record and not record.own and not keep_others then
-				drop_unit(event_manager, unit)
+			if record then
+				if record.side == "other" and not keep_others then
+					drop_unit(event_manager, unit)
+				elseif record.side == "keystone" and not keep_keystone then
+					drop_unit(event_manager, unit)
+				end
 			end
 		end
 	end
@@ -640,16 +676,19 @@ local function tick()
 
 			if mark_name and unit_alive(unit) and health_alive(unit) then
 				if is_target(unit, mark_name) then
-					local own = own_mark(unit)
+					local side = side_of(mark_name, unit, nil)
+					local wanted = side == "own"
+						or (side == "other" and others_enabled())
+						or (side == "keystone" and keystone_enabled())
 
-					if own or others_enabled() then
-						local record = { name = mark_name, own = own }
+					if wanted then
+						local record = { name = mark_name, side = side }
 
 						-- Recorded before the trigger: the engine may create the
 						-- marker and answer synchronously, and a re-entrant scan
 						-- must not add the same unit twice.
 						live[unit] = record
-						StickMarker.set_own(unit, own)
+						StickMarker.set_side(unit, side)
 
 						-- The engine hands back the new marker's id here. That id
 						-- is the only handle `remove_world_marker` accepts; if the
@@ -657,8 +696,10 @@ local function tick()
 						pcall(event_manager.trigger, event_manager, "add_world_marker_unit", TEMPLATE, unit, function(marker_id)
 							record.id = marker_id
 						end)
-					else
+					elseif side == "other" then
 						other_hidden = other_hidden + 1
+					else
+						keystone_hidden = keystone_hidden + 1
 					end
 				else
 					skipped = skipped + 1
@@ -826,6 +867,7 @@ mod.on_disabled = function()
 	no_breed = 0
 	dropped = 0
 	other_hidden = 0
+	keystone_hidden = 0
 end
 
 mod.on_game_state_changed = function(status, state_name)
@@ -838,6 +880,7 @@ mod.on_game_state_changed = function(status, state_name)
 		no_breed = 0
 		dropped = 0
 		other_hidden = 0
+	keystone_hidden = 0
 	end
 end
 
@@ -886,15 +929,17 @@ mod:command("stick_diag", "MarkedStick: print the current state", function()
 
 	local live_count = 0
 	local no_id = 0
-	local own_count, other_count = 0, 0
+	local own_count, other_count, keystone_count = 0, 0, 0
 
 	for _, record in pairs(live) do
 		live_count = live_count + 1
 
-		if record.own then
-			own_count = own_count + 1
-		else
+		if record.side == "other" then
 			other_count = other_count + 1
+		elseif record.side == "keystone" then
+			keystone_count = keystone_count + 1
+		else
+			own_count = own_count + 1
 		end
 
 		if record.id == nil then
@@ -928,10 +973,12 @@ mod:command("stick_diag", "MarkedStick: print the current state", function()
 	))
 
 	mod:echo(string.format(
-		"owners: mine=%d theirs=%d hidden=%d",
+		"owners: mine=%d theirs=%d keystone=%d hidden=%d/%d",
 		own_count,
 		other_count,
-		other_hidden
+		keystone_count,
+		other_hidden,
+		keystone_hidden
 	))
 
 	mod:echo("layers: " .. (#names > 0 and table.concat(names, ", ") or "none"))
@@ -1015,10 +1062,11 @@ mod:command("stick_own", "MarkedStick: print how the marks were attributed", fun
 			end
 
 			mod:echo(string.format(
-				"  %s -> %s (tag=%s)",
+				"  %s -> %s (tag=%s, mark=%s)",
 				tostring(unit),
-				record.own and "MINE" or "THEIRS",
-				tostring(tag_id)
+				string.upper(record.side or "own"),
+				tostring(tag_id),
+				tostring(record.name)
 			))
 		end
 	end

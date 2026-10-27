@@ -242,6 +242,114 @@ return {
 				step_size_value = 10,
 			},
 			{
+			-- ------------------------------------------------------------------
+			-- KEYSTONE marks: the class talent's own bookkeeping, not a tag.
+			-- The psyker keystone also lands on scabs and dregs, which cannot be
+			-- tagged by hand at all, so these bodies only ever appear because of
+			-- the talent -- and they get their own set so they can be told apart
+			-- from both of the tag-driven ones. Default amber: far from the
+			-- magenta of your own marks and from the cyan of a teammate's.
+			-- The switch at the top hides them completely, which is what a
+			-- psyker wants on a weak machine: a keystone can hold several
+			-- skeletons at once.
+			-- ------------------------------------------------------------------
+			setting_id = "stick_keystone_enabled",
+			type = "checkbox",
+			title = "stick_keystone_enabled_title",
+			tooltip = "stick_keystone_enabled_description",
+			default_value = true,
+			},
+			{
+			setting_id = "stick_keystone_color",
+			type = "color",
+			title = "stick_keystone_color_title",
+			tooltip = "stick_keystone_color_description",
+			default_value = { 255, 255, 196, 64 },
+			has_alpha = false,
+			},
+			{
+			setting_id = "stick_keystone_head_color",
+			type = "color",
+			title = "stick_keystone_head_color_title",
+			tooltip = "stick_keystone_head_color_description",
+			default_value = { 255, 255, 196, 64 },
+			has_alpha = false,
+			},
+			{
+			setting_id = "stick_keystone_rgb",
+			type = "checkbox",
+			title = "stick_keystone_rgb_title",
+			tooltip = "stick_keystone_rgb_description",
+			default_value = true,
+			},
+			{
+			setting_id = "stick_keystone_rgb_speed",
+			type = "numeric",
+			title = "stick_keystone_rgb_speed_title",
+			tooltip = "stick_keystone_rgb_speed_description",
+			default_value = 100,
+				range = { 10, 300 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
+			setting_id = "stick_keystone_breath",
+			type = "checkbox",
+			title = "stick_keystone_breath_title",
+			tooltip = "stick_keystone_breath_description",
+			default_value = true,
+			},
+			{
+			setting_id = "stick_keystone_breath_depth",
+			type = "numeric",
+			title = "stick_keystone_breath_depth_title",
+			tooltip = "stick_keystone_breath_depth_description",
+			default_value = 40,
+				range = { 0, 80 },
+				decimals_number = 0,
+				step_size_value = 5,
+			},
+			{
+			setting_id = "stick_keystone_breath_speed",
+			type = "numeric",
+			title = "stick_keystone_breath_speed_title",
+			tooltip = "stick_keystone_breath_speed_description",
+			default_value = 300,
+				range = { 10, 300 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
+			setting_id = "stick_keystone_thickness",
+			type = "numeric",
+			title = "stick_keystone_thickness_title",
+			tooltip = "stick_keystone_thickness_description",
+			default_value = 6,
+				range = { 1, 8 },
+				decimals_number = 0,
+				step_size_value = 1,
+			},
+			{
+			setting_id = "stick_keystone_glow",
+			type = "numeric",
+			title = "stick_keystone_glow_title",
+			tooltip = "stick_keystone_glow_description",
+			default_value = 50,
+				range = { 0, 200 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
+			setting_id = "stick_keystone_dot_size",
+			type = "numeric",
+			title = "stick_keystone_dot_size_title",
+			tooltip = "stick_keystone_dot_size_description",
+			default_value = 150,
+				range = { 120, 300 },
+				decimals_number = 0,
+				step_size_value = 10,
+			},
+			{
 				-- Beads per segment, and the only performance lever in the mod.
 				-- The ceiling is 24 because a segment is only ~100 px long even
 				-- at point-blank range: past that the beads already touch and a

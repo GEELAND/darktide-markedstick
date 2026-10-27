@@ -29,7 +29,7 @@ An outline lives in 3D and is sorted by depth, so a nearer enemy's outline alway
 - **Four-band neon**: a near-white core plus three halos at 252 / 158 / 66 / 28 alpha, each wider than the last. A single halo band is a hard edge; four are a falloff.
 - **Distance** in metres under the skeleton.
 - **Optional motion**: a sine breath (never a blink) and an RGB colour cycle, both starting from the colour you picked. The head can carry its own colour.
-- **Your marks and your teammates'**, as two complete colour sets. The split comes from the game's own tag record (who applied the tag). An enemy you marked stays yours even if a teammate re-tags it -- the colour never changes under your hands -- while an enemy that was only theirs turns yours the moment you tag it.
+- **Three kinds of mark, three complete colour sets.** Yours, a teammate's, and the one your keystone talent puts there by itself. The first two are told apart by the game's own tag record (who applied the tag); a keystone mark is not a tag at all -- it is the talent's bookkeeping, and it lands on scabs and dregs that cannot be tagged by hand -- so it gets a set of its own. An enemy you marked stays yours even if a teammate re-tags it -- the colour never changes under your hands -- while an enemy that was only theirs turns yours the moment you tag it, and a keystone-marked body you tag by hand becomes yours too.
 - **Keystone marks reach trash too.** The psyker keystone also lands on scabs and dregs, and those cannot be tagged by hand, so they used to be filtered out entirely. A keystone mark now draws a skeleton whatever the breed; horde bodies you tag by hand are still skipped.
 
 Range never takes the lines away. The chains and the joint dots are drawn at every distance; what recedes is the glow, which dims towards a floor so a far target is a thin neon line instead of six disconnected dots.
@@ -51,8 +51,13 @@ Range never takes the lines away. The chains and the joint dots are drawn at eve
 | Teammates' cycle / speed | on / 100 | their cycle has its own origin and speed |
 | Teammates' breathing / depth / speed | on / 40 / 300 | independent of your own breathing |
 | Teammates' thickness / glow / joint size | 8 / 50 / 150 | same weight as yours; their joints sit on the 180 % floor |
+| Keystone marks | on | draw enemies your keystone talent marked by itself. Off hides them entirely |
+| Keystone colour / head colour | amber | the third set, independent of the other two |
+| Keystone cycle / speed | on / 100 | its own clock, so it never drags the other two sets |
+| Keystone breathing / depth / speed | on / 40 / 300 | independent of the other two sets |
+| Keystone thickness / glow / joint size | 6 / 50 / 150 | a touch thinner than yours, so your own marks stay the loudest |
 | Beads per segment | 24 | ceiling, 2-24. Bites up close only. Also the performance lever |
-| Head / torso / arms / legs / distance | on | per-group switches, shared by both sets |
+| Head / torso / arms / legs / distance | on | per-group switches, shared by all three sets |
 
 The joint dot size is a percentage of the line width and can never go below 180 %; with the shipped 200 the dots sit clearly above that floor.
 
@@ -89,7 +94,7 @@ The menu and descriptions follow the game's language setting: English, Simplifie
 
 **默认外观**（1.1.0 定版）：粗细 8、霓虹强度 50、关节点 200、每段珠子 24、呼吸开启（强度 40、速度 300）、RGB 循环开启；队友那套默认同粗细、关节点 150、青色调。全部 28 项设置都可在菜单里改。
 
-**自己与他人分开显示**：你自己标记的敌人用一套颜色（默认品红），队友标记的敌人用另一套（默认青色），两套都各自带身体色、头部色、RGB 循环与速度、霓虹强度、粗细、关节点大小、呼吸灯。判断依据是游戏自己记录的标记者。**你标记的敌人即使之后被队友重新标记，也保持你的颜色**（引擎里一个目标只持一个标记，队友覆盖后 tag 归他，但骨架不会在你眼前换主人）；反过来，本来只有队友标记的敌人，你一标记就变成你的。不想要队友的标记就把「队友的标记」关掉。
+**三类标记、三套颜色**：你自己标记的敌人用一套（默认品红），队友标记的用另一套（默认青色），**基石天赋自己标的用第三套（默认琥珀色）**。三套都各自带身体色、头部色、RGB 循环与速度、霓虹强度、粗细、关节点大小、呼吸灯，互不干扰。判断依据是游戏自己记录的标记者。**你标记的敌人即使之后被队友重新标记，也保持你的颜色**（引擎里一个目标只持一个标记，队友覆盖后 tag 归他，但骨架不会在你眼前换主人）；反过来，本来只有队友标记的敌人，你一标记就变成你的。不想要队友的标记就把「队友的标记」关掉。
 
 **基石天赋标记的小兵也会画**：灵能「扰动命运」这类基石会标记血痂/渣滓小兵，而这些敌人无法手动标记，旧版会把它们整个过滤掉。现在只要带的是基石标记，不论兵种都画骨架；**你自己手动标记的小兵仍然不画**，免得满屏骨架。
 

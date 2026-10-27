@@ -185,6 +185,116 @@ return {
 		["zh-cn"] = "在骨架下方显示以米为单位的距离。",
 		["zh-tw"] = "在骨架下方顯示以米為單位的距離。",
 	},
+	stick_keystone_enabled_title = {
+		en = "Keystone marks",
+		["zh-cn"] = "基石天赋的标记",
+		["zh-tw"] = "基石天賦的標記",
+	},
+	stick_keystone_enabled_description = {
+		en = "Also draw a skeleton on enemies your keystone talent marks by itself. It gets its own colour set, because these marks are the talent's bookkeeping rather than a tag -- the psyker keystone also marks scabs and dregs, which cannot be tagged by hand at all. Off hides them completely, which is worth knowing on a weak machine: one keystone can hold several skeletons at once.",
+		["zh-cn"] = "基石天赋自动标记的敌人也画骨架。它单独有一套颜色，因为这些标记不是「标记」而是天赋自己的记账——灵能基石连血痂、渣滓都会标，而这些敌人根本无法手动标记。关掉则完全不显示；机器较弱时值得注意：一个基石可能同时挂着好几具骨架。",
+		["zh-tw"] = "基石天賦自動標記的敵人也畫骨架。它單獨有一套顏色，因為這些標記不是「標記」而是天賦自己的記帳——靈能基石連血痂、渣滓都會標，而這些敵人根本無法手動標記。關掉則完全不顯示；機器較弱時值得注意：一個基石可能同時掛著好幾具骨架。",
+	},
+	stick_keystone_color_title = {
+		en = "Keystone colour",
+		["zh-cn"] = "基石标记的颜色",
+		["zh-tw"] = "基石標記的顏色",
+	},
+	stick_keystone_color_description = {
+		en = "The gas colour for enemies the keystone marked. A third set on top of your own colour and your teammates', so all three can be told apart at a glance.",
+		["zh-cn"] = "被基石标记的敌人所用的颜色。在你自己的颜色和队友的颜色之外，这是第三套，三者一眼可分。",
+		["zh-tw"] = "被基石標記的敵人所用的顏色。在你自己的顏色和隊友的顏色之外，這是第三套，三者一眼可分。",
+	},
+	stick_keystone_head_color_title = {
+		en = "Keystone head colour",
+		["zh-cn"] = "基石标记的头部颜色",
+		["zh-tw"] = "基石標記的頭部顏色",
+	},
+	stick_keystone_head_color_description = {
+		en = "The colour of the neck segment and the head dot on a keystone mark. Defaults to its body colour.",
+		["zh-cn"] = "基石标记的头颈段与头部关节点的颜色。默认与其身体颜色相同。",
+		["zh-tw"] = "基石標記的頭頸段與頭部關節點的顏色。預設與其身體顏色相同。",
+	},
+	stick_keystone_rgb_title = {
+		en = "Keystone colour cycle",
+		["zh-cn"] = "基石标记的 RGB 循环",
+		["zh-tw"] = "基石標記的 RGB 循環",
+	},
+	stick_keystone_rgb_description = {
+		en = "Drifts the hue of the keystone set around the wheel, starting from the colour picked above. Runs on its own clock, so it does not drag the other two sets with it.",
+		["zh-cn"] = "让基石标记那一套的色相绕环漂移，起点是上面选的颜色。它走自己的时钟，不会带动另外两套。",
+		["zh-tw"] = "讓基石標記那一套的色相繞環漂移，起點是上面選的顏色。它走自己的時鐘，不會帶動另外兩套。",
+	},
+	stick_keystone_rgb_speed_title = {
+		en = "Keystone cycle speed (%% of 9 s per lap)",
+		["zh-cn"] = "基石 RGB 速度（%% of 9 秒一圈）",
+		["zh-tw"] = "基石 RGB 速度（%% of 9 秒一圈）",
+	},
+	stick_keystone_rgb_speed_description = {
+		en = "How fast the keystone set's hue travels. 100 is one lap every nine seconds.",
+		["zh-cn"] = "基石那一套的色相移动多快。100 表示九秒一圈。",
+		["zh-tw"] = "基石那一套的色相移動多快。100 表示九秒一圈。",
+	},
+	stick_keystone_breath_title = {
+		en = "Keystone breathing",
+		["zh-cn"] = "基石标记的呼吸灯",
+		["zh-tw"] = "基石標記的呼吸燈",
+	},
+	stick_keystone_breath_description = {
+		en = "A sine sway in brightness for the keystone set, independent of the other two sets.",
+		["zh-cn"] = "基石那一套的亮度正弦起伏，与另外两套互不干扰。",
+		["zh-tw"] = "基石那一套的亮度正弦起伏，與另外兩套互不干擾。",
+	},
+	stick_keystone_breath_depth_title = {
+		en = "Keystone breath depth",
+		["zh-cn"] = "基石呼吸强度",
+		["zh-tw"] = "基石呼吸強度",
+	},
+	stick_keystone_breath_depth_description = {
+		en = "How far the keystone set dims at the bottom of each breath, as a percentage. 0 gives a steady lamp; the ceiling of 80 keeps a fifth of the light so it never blinks out.",
+		["zh-cn"] = "基石那一套每次呼吸最暗时亮度下降多少（百分比）。填 0 为恒定满亮；上限 80 保证最暗仍留五分之一的光，不会熄灭。",
+		["zh-tw"] = "基石那一套每次呼吸最暗時亮度下降多少（百分比）。填 0 為恆定滿亮；上限 80 保證最暗仍留五分之一的光，不會熄滅。",
+	},
+	stick_keystone_breath_speed_title = {
+		en = "Keystone breath speed",
+		["zh-cn"] = "基石呼吸速度",
+		["zh-tw"] = "基石呼吸速度",
+	},
+	stick_keystone_breath_speed_description = {
+		en = "How fast the keystone set breathes. 300 is the fastest.",
+		["zh-cn"] = "基石那一套呼吸的快慢。300 最快。",
+		["zh-tw"] = "基石那一套呼吸的快慢。300 最快。",
+	},
+	stick_keystone_thickness_title = {
+		en = "Keystone thickness",
+		["zh-cn"] = "基石标记的线条粗细",
+		["zh-tw"] = "基石標記的線條粗細",
+	},
+	stick_keystone_thickness_description = {
+		en = "Line thickness for keystone marks. Slightly thinner than your own by default, so the enemies you deliberately marked stay the loudest thing on screen.",
+		["zh-cn"] = "基石标记的线条粗细。默认比你自己标记的略细一点，让你主动标记的敌人始终是画面上最醒目的。",
+		["zh-tw"] = "基石標記的線條粗細。預設比你自己標記的略細一點，讓你主動標記的敵人始終是畫面上最醒目的。",
+	},
+	stick_keystone_glow_title = {
+		en = "Keystone glow (%% of the main setting)",
+		["zh-cn"] = "基石标记的霓虹强度（%% of 主设置）",
+		["zh-tw"] = "基石標記的霓虹強度（%% of 主設置）",
+	},
+	stick_keystone_glow_description = {
+		en = "Halo spread and brightness for keystone marks. 0 leaves only the lit cores.",
+		["zh-cn"] = "基石标记的光晕扩散范围与亮度。0 只留发光的芯。",
+		["zh-tw"] = "基石標記的光暈擴散範圍與亮度。0 只留發光的芯。",
+	},
+	stick_keystone_dot_size_title = {
+		en = "Keystone joint dot size",
+		["zh-cn"] = "基石标记的关节点大小",
+		["zh-tw"] = "基石標記的關節點大小",
+	},
+	stick_keystone_dot_size_description = {
+		en = "Joint dot size on keystone marks, as a share of their line width. Below 180 the joints stop reading as dots, so that is the floor.",
+		["zh-cn"] = "基石标记的关节点大小，按其线宽的比例计算。低于 180 关节点就不再像点，所以那是下限。",
+		["zh-tw"] = "基石標記的關節點大小，按其線寬的比例計算。低於 180 關節點就不再像點，所以那是下限。",
+	},
 	stick_other_enabled_title = {
 		en = "Teammates' marks",
 		["zh-cn"] = "队友的标记",

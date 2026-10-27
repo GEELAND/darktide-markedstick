@@ -110,6 +110,19 @@ local DEFAULT_RGB = { 255, 60, 178 }
 -- from the default magenta, so an untouched install already shows the split.
 local OTHER_RGB = { 60, 220, 255 }
 
+-- The keystone marks get a third set. Amber: a keystone mark is the talent's
+-- own bookkeeping rather than a tag, and it lands on trash the player cannot
+-- tag by hand at all, so it is a different kind of thing on screen -- worth
+-- telling apart from both of the tag-driven sets.
+local KEYSTONE_RGB = { 255, 196, 64 }
+
+-- One map from side to everything that differs between the three sets: which
+-- settings prefix to read, and what to fall back to when that prefix has no
+-- saved value yet.
+local SIDE_RGB = { own = DEFAULT_RGB, other = OTHER_RGB, keystone = KEYSTONE_RGB }
+local SIDE_PREFIX = { own = "stick_", other = "stick_other_", keystone = "stick_keystone_" }
+local SIDES = { "own", "other", "keystone" }
+
 -- The distance readout keeps the game's own gold: it is a number, not a light.
 local LABEL = { 255, 255, 205, 105 }
 local SHADOW = { 190, 0, 0, 0 }
@@ -415,24 +428,43 @@ template.rig_order = RIG_ORDER
 -- The marker module never asks the engine itself: the scan already has the
 -- tag in hand, and a second lookup per frame per marker would only be able to
 -- disagree with it.
-local OWN = setmetatable({}, { __mode = "k" })
+-- Which of the three colour sets paints this unit: "own", "other" or
+-- "keystone". Stored as a string rather than a boolean because the third set
+-- cannot be expressed by "mine or not mine".
+local SIDE_OF_UNIT = setmetatable({}, { __mode = "k" })
 
-function template.set_own(unit, is_own)
+function template.set_side(unit, side)
 	if not unit then
 		return
 	end
 
-	OWN[unit] = is_own and true or false
+	if side == "other" then
+		SIDE_OF_UNIT[unit] = "other"
+	elseif side == "keystone" then
+		SIDE_OF_UNIT[unit] = "keystone"
+	else
+		SIDE_OF_UNIT[unit] = "own"
+	end
+end
+
+-- Kept because the scan used to store a boolean here. true is "mine", false is
+-- "somebody else's"; the keystone set is only ever set through set_side.
+function template.set_own(unit, is_own)
+	template.set_side(unit, is_own and "own" or "other")
 end
 
 function template.forget_own(unit)
 	if unit then
-		OWN[unit] = nil
+		SIDE_OF_UNIT[unit] = nil
 	end
 end
 
 function template.is_own(unit)
-	return OWN[unit] ~= false
+	return SIDE_OF_UNIT[unit] ~= "other"
+end
+
+function template.side(unit)
+	return SIDE_OF_UNIT[unit] or "own"
 end
 
 -- `UIFontSettings` is injected by the engine, not required. If it is missing
@@ -721,35 +753,20 @@ end
 -- no intensity gain -- losing the filament is how a glow stops reading as a
 -- tube -- but the three halo bands do, so once the widths are maxed the
 -- slider keeps buying brightness instead of doing nothing.
--- The two dim halo bands are drawn on every second / third bead instead of on
--- all of them. Consecutive beads sit 0.7 bead-widths apart while the outer band
--- is more than six widths across, so neighbours already overlap almost
--- completely: skipping the in-between ones removes a third of the quads with no
--- visible seam, and the last bead of a segment always draws its full ladder so
--- the end of a limb stays soft.
-local function place_bead(style, keys, x, y, size, pads, alpha, halo_gain, palette, i, n)
+local function place_bead(style, keys, x, y, size, pads, alpha, halo_gain, palette)
 	local drew = false
-	local sparse_mid = (i % 2 == 0) and (i ~= n)
-	local sparse_out = (i % 3 ~= 1) and (i ~= n)
 
 	for l = 1, #BEAD_LAYERS do
 		local layer = BEAD_LAYERS[l]
 		local pad = 0
-		local wanted = true
 
 		if layer.pad then
 			pad = (pads and pads[layer.pad]) or 0
 		end
 
-		if layer.pad == "mid" then
-			wanted = not sparse_mid
-		elseif layer.pad == "out" then
-			wanted = not sparse_out
-		end
-
 		-- A band with no spread is not a band: at glow 0 the halo bands are
 		-- skipped entirely instead of being drawn at the core's own size.
-		if wanted and (pad > 0 or layer.core) then
+		if pad > 0 or layer.core then
 			local s = size + pad * 2
 			local lift = layer.core and 1 or halo_gain
 
@@ -814,7 +831,7 @@ local function chain(style, seg, ax, ay, bx, by, bead, pads, alpha, halo_gain, m
 	for i = 1, n do
 		local t = (i - 1) / (n - 1)
 
-		if place_bead(style, KEYS[seg][i], ax + dx * t, ay + dy * t, bead, pads, alpha, halo_gain, palette, i, n) then
+		if place_bead(style, KEYS[seg][i], ax + dx * t, ay + dy * t, bead, pads, alpha, halo_gain, palette) then
 			drew = drew + 1
 		end
 	end
@@ -1343,7 +1360,10 @@ local clock = 0
 -- One origin PER SIDE. A shared one cannot work once the two sides have their
 -- own on/off and speed: the side with the cycle off would clear the origin
 -- every frame and freeze the side that has it on.
-local rgb_origin = { own = nil, other = nil }
+-- One origin PER SIDE, and one per side is not a detail: with a shared origin
+-- the side that has the cycle switched off clears it every frame and freezes
+-- the side that has it on.
+local rgb_origin = { own = nil, other = nil, keystone = nil }
 
 -- What the last frame actually drew with. Written once per drawn frame into a
 -- table that is never reallocated, and read by /stick_glow. It exists because
@@ -1418,10 +1438,10 @@ local function update_frame(parent, ui_renderer, widget, marker, template_ref, d
 		return
 	end
 
-	-- Whose mark this is decides which colour set paints it. `is_own` returns
-	-- false only when the scan positively identified another player's tag.
-	local own = template.is_own(unit)
-	local side_rgb = own and DEFAULT_RGB or OTHER_RGB
+	-- Which colour set paints this: mine, a teammate's, or the keystone's own.
+	-- The scan decides; this module only looks the answer up.
+	local side = template.side(unit)
+	local side_rgb = SIDE_RGB[side] or DEFAULT_RGB
 
 	local show = { head = true, torso = true, arms = true, legs = true }
 	local show_distance = true
@@ -1446,7 +1466,7 @@ local function update_frame(parent, ui_renderer, widget, marker, template_ref, d
 		show.legs = get_flag(mod, "stick_show_legs", true)
 		show_distance = get_flag(mod, "stick_show_distance", true)
 		max_beads = get_number(mod, "stick_density", BEAD_MAX, 4, BEAD_MAX)
-		cfg = read_side(mod, own and "stick_" or "stick_other_", side_rgb)
+		cfg = read_side(mod, SIDE_PREFIX[side] or "stick_", side_rgb)
 	end
 
 	if not (show.head or show.torso or show.arms or show.legs) then
@@ -1466,7 +1486,7 @@ local function update_frame(parent, ui_renderer, widget, marker, template_ref, d
 	-- of handing it a different base. The head colour drifts from its own
 	-- picked hue on the same phase, so the two stay in step without merging.
 	local phase = 0
-	local origin_key = own and "own" or "other"
+	local origin_key = side
 
 	if cfg.rgb then
 		if not rgb_origin[origin_key] then
@@ -1704,7 +1724,8 @@ local function update_frame(parent, ui_renderer, widget, marker, template_ref, d
 	LAST.bead = bead
 	LAST.pads = pads
 	LAST.gain = halo_gain
-	LAST.own = own
+	LAST.own = side == "own"
+	LAST.side = side
 	LAST.dist = dist
 end
 

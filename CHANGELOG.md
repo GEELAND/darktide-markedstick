@@ -9,6 +9,25 @@ are archived under `build/dev/` and never shipped.
 > -- English, Simplified Chinese and Traditional Chinese now all read
 > **MarkedStick**. Nothing else in either build differs.
 
+## 1.4.0
+
+- **Keystone marks are their own set.** The psyker keystone's marks are not tags
+  -- the talent also marks scabs and dregs, which cannot be tagged by hand -- so
+  they used to be painted as if they were the player's own marks. They now have a
+  third complete colour set (default amber) with its own switch, colour, head
+  colour, cycle plus speed, breathing plus depth and speed, thickness, glow and
+  joint dot size, exactly like the two tag-driven sets. The switch also has to
+  take the skeletons already on screen with it, because one keystone can hold
+  several at once.
+- A hand tag still outranks the keystone: tag one of those bodies yourself and it
+  repaints as your own mark from then on, because that is a deliberate act.
+- **The four halo bands are back on every bead.** 1.3.0 drew the two dim bands on
+  every second and third bead to save quads; the measurement afterwards showed the
+  frame time did not move at all (3.26 ms marginal before, 3.23 ms after), so the
+  saving was not worth a single pixel of the look. Reverted in full.
+
+39 settings.
+
 ## 1.3.0
 
 First build that acts on the measurements instead of just taking them.

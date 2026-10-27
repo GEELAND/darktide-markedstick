@@ -102,6 +102,17 @@ SETTINGS = {
 	stick_other_thickness = 8,
 	stick_other_glow = 50,
 	stick_other_dot_size = 150,
+	stick_keystone_enabled = true,
+	stick_keystone_color = { 255, 255, 196, 64 },
+	stick_keystone_head_color = { 255, 255, 196, 64 },
+	stick_keystone_rgb = true,
+	stick_keystone_rgb_speed = 100,
+	stick_keystone_breath = true,
+	stick_keystone_breath_depth = 40,
+	stick_keystone_breath_speed = 300,
+	stick_keystone_thickness = 6,
+	stick_keystone_glow = 50,
+	stick_keystone_dot_size = 150,
 	stick_density = 24,
 	stick_show_head = true,
 	stick_show_torso = true,
@@ -1475,61 +1486,6 @@ switch_tests()
 -- are the fix, and the assertions below read the ladder off the drawn passes.
 
 local function band_tests()
-
--- C0b-2. sparse halo bands -----------------------------------------------------
---
--- The two dim bands are drawn on every second / third bead instead of on all of
--- them: consecutive beads sit 0.7 bead-widths apart while the outer band is more
--- than six widths across, so neighbours already overlap almost completely. What
--- has to hold is that the line stays continuous (asserted by the widths above),
--- the pattern is exactly as described, and the last bead of a segment keeps its
--- full ladder so a limb does not end in a hard edge.
-local function sparse_band_tests()
-	SETTINGS.stick_glow = 100
-
-	local U = mkunit("sparse", 10, ELITE)
-	local def = frame(U, 10)
-
-	local function band(seg, i, suffix)
-		local st = def.style["b" .. seg .. "_" .. i .. "_" .. suffix]
-
-		return st ~= nil and st.visible
-	end
-
-	local seg = nil
-
-	for s = 1, 14 do
-		if band(s, 6, "c") then
-			seg = s
-			break
-		end
-	end
-
-	check(seg ~= nil, "a segment long enough to show the pattern was drawn")
-
-	if seg then
-		local n = 0
-
-		for i = 1, 24 do
-			if band(seg, i, "c") then
-				n = i
-			end
-		end
-
-		check(band(seg, 1, "c") and band(seg, 1, "i") and band(seg, 1, "m") and band(seg, 1, "o"),
-			"the first bead of a segment keeps the full four-band ladder")
-		check(band(seg, 2, "c") and band(seg, 2, "i") and not band(seg, 2, "m") and not band(seg, 2, "o"),
-			"the second bead keeps the two bright bands and drops both dim ones")
-		check(band(seg, 3, "m") and not band(seg, 3, "o"),
-			"the third brings the mid band back but not the outermost")
-		check(band(seg, 4, "o") and not band(seg, 4, "m"),
-			"the fourth brings the outer band back")
-		check(n > 5 and band(seg, n, "o") and band(seg, n, "m"),
-			"and the last bead draws every band, so a limb does not end in a hard edge")
-	end
-end
-
-sparse_band_tests()
 	-- The canonical ladder is quoted at glow 100, so the measurement is taken
 	-- there rather than inheriting whatever the previous test left behind.
 	SETTINGS.stick_glow = 100
@@ -2011,8 +1967,11 @@ local function owner_tests()
 
 	SETTINGS.stick_rgb = false
 	SETTINGS.stick_other_rgb = false
+	SETTINGS.stick_keystone_rgb = false
 	SETTINGS.stick_breath = false
 	SETTINGS.stick_other_breath = false
+	SETTINGS.stick_keystone_breath = false
+	SETTINGS.stick_keystone_enabled = true
 	SETTINGS.stick_other_enabled = true
 
 	local mine = mkunit("own_mark", 10, ELITE)
@@ -2034,8 +1993,12 @@ local function owner_tests()
 		"my own tag is painted with my colour set")
 	check(same_colour(body_rgb(draw(theirs, 0)), SETTINGS.stick_other_color),
 		"a teammate's tag is painted with theirs")
-	check(same_colour(body_rgb(draw(keystone, 0)), SETTINGS.stick_color),
-		"a mark with no smart tag at all (the class keystone) counts as mine")
+	check(same_colour(body_rgb(draw(keystone, 0)), SETTINGS.stick_keystone_color),
+		"a keystone mark is painted with its own third set")
+	check(not same_colour(body_rgb(draw(keystone, 0)), SETTINGS.stick_color),
+		"and not with mine -- the two are different kinds of mark")
+	check(not same_colour(body_rgb(draw(keystone, 0)), SETTINGS.stick_other_color),
+		"nor with a teammate's")
 
 	-- The bug that shipped in 0.2.1: the player manager takes an INDEX, so a
 	-- no-argument call answered nil. "Who am I" was empty, so every tagged
@@ -2108,8 +2071,36 @@ local function owner_tests()
 	mod.update(0.3)
 
 	check(has_marker(mook), "a keystone-marked trash mob gets a skeleton")
+	check(same_colour(body_rgb(draw(mook, 0)), SETTINGS.stick_keystone_color),
+		"in the keystone set's colours")
+
+	-- The keystone set has its own switch, like the teammates' one, and turning
+	-- it off has to take the skeletons already on screen with it -- a psyker can
+	-- have several of these up at once.
+	SETTINGS.stick_keystone_enabled = false
+	mod.update(0.016)
+
+	check(not has_marker(mook), "switching keystone marks off removes the ones already on screen")
+	check(has_marker(mine), "while my own mark stays")
+
+	echo_lines = {}
+	commands.stick_diag()
+
+	check(string.find(table.concat(echo_lines, " | "), "keystone=", 1, true) ~= nil,
+		"and the diag reports the keystone count separately")
+
+	SETTINGS.stick_keystone_enabled = true
+	mod.update(0.3)
+
+	check(has_marker(mook), "turning it back on brings the mark back")
+
+	-- A hand tag outranks the keystone: the player deliberately claimed this one,
+	-- so it has to look like their own mark from then on.
+	tag_by(ME, mook)
+	mod.update(0.3)
+
 	check(same_colour(body_rgb(draw(mook, 0)), SETTINGS.stick_color),
-		"in my own colours -- a keystone mark has no tag, so it is mine")
+		"hand-tagging a keystone-marked enemy repaints it as mine")
 
 	-- The same body with a manual tag is still filtered out: tagging trash by
 	-- hand must not turn the HUD into a horde of skeletons.
@@ -2176,6 +2167,13 @@ local function owner_tests()
 	SETTINGS.stick_other_rgb = true
 	SETTINGS.stick_breath = true
 	SETTINGS.stick_other_breath = true
+
+	SETTINGS.stick_rgb = true
+	SETTINGS.stick_other_rgb = true
+	SETTINGS.stick_keystone_rgb = true
+	SETTINGS.stick_breath = true
+	SETTINGS.stick_other_breath = true
+	SETTINGS.stick_keystone_breath = true
 
 	reset_tags()
 	keep_only({})
@@ -2557,6 +2555,17 @@ local expected = {
 	{ id = "stick_other_thickness", type = "numeric", default = 8,  range = { 1, 8 } },
 	{ id = "stick_other_glow",    type = "numeric",  default = 50,  range = { 0, 200 } },
 	{ id = "stick_other_dot_size", type = "numeric", default = 150, range = { 120, 300 } },
+	{ id = "stick_keystone_enabled", type = "checkbox", default = true },
+	{ id = "stick_keystone_color",   type = "color" },
+	{ id = "stick_keystone_head_color", type = "color" },
+	{ id = "stick_keystone_rgb",     type = "checkbox", default = true },
+	{ id = "stick_keystone_rgb_speed", type = "numeric", default = 100, range = { 10, 300 } },
+	{ id = "stick_keystone_breath",  type = "checkbox", default = true },
+	{ id = "stick_keystone_breath_depth", type = "numeric", default = 40, range = { 0, 80 } },
+	{ id = "stick_keystone_breath_speed", type = "numeric", default = 300, range = { 10, 300 } },
+	{ id = "stick_keystone_thickness", type = "numeric", default = 6, range = { 1, 8 } },
+	{ id = "stick_keystone_glow",    type = "numeric", default = 50, range = { 0, 200 } },
+	{ id = "stick_keystone_dot_size", type = "numeric", default = 150, range = { 120, 300 } },
 	{ id = "stick_density",       type = "numeric",  default = 24,  range = { 2, 24 } },
 	{ id = "stick_show_head",     type = "checkbox", default = true },
 	{ id = "stick_show_torso",    type = "checkbox", default = true },
