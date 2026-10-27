@@ -1,14 +1,14 @@
-# MarkedStick 1.2.1 说明（自测版：把帧数问题变成数字）
+# MarkedStick 1.2.2 说明（自测版：把帧数问题变成数字）
 
 > **游戏内名字**：mod 列表里三语都显示 **MarkedStick**。
 
 ## 0. 先看这一条：zip 必须解压
 
-`MarkedStick_v1.2.1.zip` **不能直接丢进 `mods/`**。DMF 只扫目录、不读 zip，直接放进去 mod 列表里
+`MarkedStick_v1.2.2.zip` **不能直接丢进 `mods/`**。DMF 只扫目录、不读 zip，直接放进去 mod 列表里
 不会出现这个 mod。
 
 ```
-解压 MarkedStick_v1.2.1.zip → 得到 MarkedStick/ 文件夹
+解压 MarkedStick_v1.2.2.zip → 得到 MarkedStick/ 文件夹
 放到 <游戏目录>/mods/MarkedStick/
 确认 <游戏目录>/mods/MarkedStick/MarkedStick.mod 存在
 进游戏 → mod 列表启用「MarkedStick」→ 重启或重载
@@ -25,6 +25,17 @@
 
 计时用引擎自带的高精度计数器（`Application.query_performance_counter`）；如果这个构建没暴露它，
 会退回 `os.clock`，报告里会写 `timer=os.clock`——那种情况下精度只有 1 毫秒，数字只能当参考。
+
+## 1.5 1.2.2 修了什么（1.2.1 的统计是坏的）
+
+1.2.1 第一局记录下来的数据不能直接用，两个 bug：
+
+- **单位算错**：`dt` 是秒，报告按毫秒显示，但平均帧时间漏了 ×1000 ⇒ 13 ms 的帧被写成
+  `avg 0.01 ms (73671.7 fps)`。现在入口处统一换算，并有断言把 60 fps 钉成 `avg 16.00 ms (62.5 fps)`。
+- **百分号被日志通道吃掉**：DMF 会把每条消息再走一次 `string.format`，所以 `2.5% of a frame`
+  被当成转换符，报 `invalid option '% |'`，**最关键的三行直接没进日志**。现在报告里写 `pct`，
+  并加了守卫：跑完整套测试，任何一条发往聊天/日志的行只要含 `%` 就红。
+- 分桶那行现在**同时给出该桶里我们自己的 Lua 花费**，一局就能分清"帧变慢"和"我们的代码变慢"。
 
 ## 2. 你需要做的事
 
@@ -55,10 +66,10 @@
 
 ```
 [MOD][MarkedStick][INFO] [perf] session: 412.3 s, 24700 frames, avg 16.69 ms (59.9 fps), max 21.4 ms, timer=engine
-[MOD][MarkedStick][INFO] [perf] frame time by skeletons on screen: 0 -> 15.90 ms (n=8200)  |  1-2 -> 16.40 ms (n=11000)  |  3-4 -> 17.80 ms (n=4600)
-[MOD][MarkedStick][INFO] [perf] our Lua: 0.412 ms/frame = 2.5% of a frame at 2.13 skeletons (widget 0.381, scan 0.031)
-[MOD][MarkedStick][INFO] [perf] inside a widget frame: clear pool 41% | draw writes 33% | joints 26%
-[MOD][MarkedStick][INFO] [perf] light sources drawn: 128/frame avg, 176 max (beads + joint dots), 6 markers max, skipped 0 frames
+[perf] frame time by skeletons on screen (second number is our own Lua): 0 -> 15.90 ms (n=8200, ours 0.021)  |  1-2 -> 16.40 ms (n=11000, ours 0.412)  |  3-4 -> 17.80 ms (n=4600, ours 0.803)
+[perf] our Lua: 0.412 ms/frame = 2.5 pct of the frame at 2.13 skeletons (widget 0.381, scan 0.031)
+[perf] inside a widget frame: clear pool 41 pct | draw writes 33 pct | joints 26 pct
+[perf] light sources drawn: 128/frame avg, 176 max (beads + joint dots), 6 markers max, skipped 0 frames
 ```
 
 （上面是格式示例，数字以实测为准。）

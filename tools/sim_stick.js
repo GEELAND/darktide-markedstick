@@ -66,6 +66,12 @@ end
 local created = {}
 local echo_lines = {}
 local info_lines = {}
+-- Every line that reaches chat or the log, checked for a literal percent sign.
+-- Both channels run the text through string.format again (DMF does that so
+-- localized strings can carry arguments), so a "%" in the message is read as a
+-- conversion and the whole line is lost with a visible error. This is not
+-- theoretical: 1.2.1 logged "invalid option '% |'" four times a minute.
+local percent_hits = {}
 local commands = {}
 
 -- The SHIPPED defaults, i.e. what a fresh install gets: breathing and the
@@ -488,10 +494,18 @@ mod_obj = {
 		return chunk()
 	end,
 	get = function(self, key) return SETTINGS[key] end,
-	echo = function(self, s) echo_lines[#echo_lines + 1] = tostring(s) end,
+	echo = function(self, s)
+		local text = tostring(s)
+		echo_lines[#echo_lines + 1] = text
+		if string.find(text, "%", 1, true) then percent_hits[#percent_hits + 1] = "echo: " .. text end
+	end,
 	-- The DMF log channel. The perf report goes here as well as to chat, which
 	-- is what makes a session readable after the game is closed.
-	info = function(self, s) info_lines[#info_lines + 1] = tostring(s) end,
+	info = function(self, s)
+		local text = tostring(s)
+		info_lines[#info_lines + 1] = text
+		if string.find(text, "%", 1, true) then percent_hits[#percent_hits + 1] = "info: " .. text end
+	end,
 	command = function(self, name, desc, cb) commands[name] = cb end,
 }
 
@@ -2162,6 +2176,13 @@ local function perf_tests()
 		"the report buckets frame time by how many skeletons were on screen")
 	check(string.find(report, "our Lua", 1, true) ~= nil,
 		"and prints how much of the frame our own code spent")
+	-- dt arrives in SECONDS and the report is in MILLISECONDS. 1.2.1 shipped
+	-- with the *1000 missing and logged "avg 0.01 ms (73671.7 fps)" for a 13 ms
+	-- frame, which reads like "the mod is free" instead of "the number is wrong".
+	check(string.find(report, "avg 16.00 ms", 1, true) ~= nil,
+		"a 60 fps frame reports as 16.00 ms, not 0.02 ms")
+	check(string.find(report, "avg 16.00 ms (62.5 fps)", 1, true) ~= nil,
+		"and the fps column is the reciprocal of that, not of the seconds value")
 	check(string.find(report, "light sources drawn", 1, true) ~= nil,
 		"and how many beads were actually drawn")
 	check(string.find(report, "light sources drawn: 0/", 1, true) == nil,
@@ -2207,6 +2228,10 @@ local function perf_tests()
 end
 
 perf_tests()
+
+-- No line that reaches chat or the log may contain a literal percent sign.
+check(#percent_hits == 0, "no chat or log line carries a literal percent sign (" .. #percent_hits .. " found)")
+for i = 1, #percent_hits do OUT.checks[#OUT.checks + 1] = "      " .. percent_hits[i] end
 
 OUT.summary = table.concat(OUT.checks, "\\n")
 OUT.echo = table.concat(echo_lines, " | ")

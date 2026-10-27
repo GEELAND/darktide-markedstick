@@ -1054,6 +1054,8 @@ local perf = {
 	b_n = { 0, 0, 0, 0 },
 	b_sum = { 0, 0, 0, 0 },
 	b_max = { 0, 0, 0, 0 },
+	b_cpu = { 0, 0, 0, 0 },
+	cpu_frame = 0,
 	markers_max = 0,
 	markers_sum = 0,
 	beads_sum = 0,
@@ -1070,8 +1072,10 @@ local function perf_reset()
 	perf.frames, perf.skipped, perf.dt_sum, perf.dt_max = 0, 0, 0, 0
 
 	for i = 1, 4 do
-		perf.b_n[i], perf.b_sum[i], perf.b_max[i] = 0, 0, 0
+		perf.b_n[i], perf.b_sum[i], perf.b_max[i], perf.b_cpu[i] = 0, 0, 0, 0
 	end
+
+	perf.cpu_frame = 0
 
 	perf.markers_max, perf.markers_sum = 0, 0
 	perf.beads_sum, perf.beads_max, perf.beads_frame = 0, 0, 0
@@ -1138,11 +1142,16 @@ function template.perf_tick(dt, markers, in_mission)
 		return nil
 	end
 
-	perf.frames = perf.frames + 1
-	perf.dt_sum = perf.dt_sum + dt
+	-- Milliseconds from here on. The engine hands over seconds, and every number
+	-- in the report is a millisecond; mixing the two is how "0.01 ms" got logged
+	-- for a 13 ms frame.
+	local ms = dt * 1000
 
-	if dt > perf.dt_max then
-		perf.dt_max = dt
+	perf.frames = perf.frames + 1
+	perf.dt_sum = perf.dt_sum + ms
+
+	if ms > perf.dt_max then
+		perf.dt_max = ms
 	end
 
 	if markers > perf.markers_max then
@@ -1154,10 +1163,15 @@ function template.perf_tick(dt, markers, in_mission)
 	local b = bucket_of(markers)
 
 	perf.b_n[b] = perf.b_n[b] + 1
-	perf.b_sum[b] = perf.b_sum[b] + dt
+	perf.b_sum[b] = perf.b_sum[b] + ms
+	-- Whatever our own code cost since the previous tick belongs to this bucket.
+	-- One frame late, which over thousands of frames is noise -- and it makes the
+	-- bucket line answer "how much of that cost is us" directly.
+	perf.b_cpu[b] = perf.b_cpu[b] + perf.cpu_frame
+	perf.cpu_frame = 0
 
-	if dt > perf.b_max[b] then
-		perf.b_max[b] = dt
+	if ms > perf.b_max[b] then
+		perf.b_max[b] = ms
 	end
 
 	perf.beads_sum = perf.beads_sum + perf.beads_frame
@@ -1167,9 +1181,9 @@ function template.perf_tick(dt, markers, in_mission)
 	end
 
 	perf.beads_frame = 0
-	perf.since_report = perf.since_report + dt
+	perf.since_report = perf.since_report + ms
 
-	if perf.since_report >= 120 then
+	if perf.since_report >= 120000 then
 		perf.since_report = 0
 
 		return "report"
@@ -1183,6 +1197,7 @@ end
 function template.perf_scan(ms)
 	if perf.started and type(ms) == "number" and ms > 0 then
 		perf.cpu_scan = perf.cpu_scan + ms
+		perf.cpu_frame = perf.cpu_frame + ms
 	end
 end
 
@@ -1199,8 +1214,8 @@ function template.perf_report()
 
 	local avg = perf.dt_sum / perf.frames
 
-	lines[1] = string.format("[perf] %s: %.1f s, %d frames, avg %.2f ms (%.1f fps), max %.1f ms, timer=%s",
-		"session", perf.dt_sum, perf.frames, avg, 1000 / avg, perf.dt_max,
+	lines[1] = string.format("[perf] session: %.1f s, %d frames, avg %.2f ms (%.1f fps), max %.1f ms, timer=%s",
+		perf.dt_sum / 1000, perf.frames, avg, 1000 / avg, perf.dt_max,
 		hires_state and "engine" or "os.clock")
 
 	local labels = { "0", "1-2", "3-4", "5+" }
@@ -1208,19 +1223,26 @@ function template.perf_report()
 
 	for i = 1, 4 do
 		if perf.b_n[i] > 0 then
-			parts[#parts + 1] = string.format("%s -> %.2f ms (n=%d)", labels[i],
-				perf.b_sum[i] / perf.b_n[i], perf.b_n[i])
+			parts[#parts + 1] = string.format("%s -> %.2f ms (n=%d, ours %.3f)", labels[i],
+				perf.b_sum[i] / perf.b_n[i], perf.b_n[i], perf.b_cpu[i] / perf.b_n[i])
 		end
 	end
 
-	lines[2] = "[perf] frame time by skeletons on screen: " .. table.concat(parts, "  |  ")
+	lines[2] = "[perf] frame time by skeletons on screen (second number is our own Lua): " ..
+		table.concat(parts, "  |  ")
 
 	local our = perf.cpu_widget + perf.cpu_scan
 	local per_frame = our / perf.frames
 	local share = avg > 0 and (per_frame / avg) * 100 or 0
 	local avg_markers = perf.markers_sum / perf.frames
 
-	lines[3] = string.format("[perf] our Lua: %.3f ms/frame = %.1f%% of a frame at %.2f skeletons " ..
+	-- No literal percent sign anywhere in these lines. Both log channels pipe
+	-- the message back through string.format (DMF does that so localized strings
+	-- can carry arguments), so a bare "%" in the text is read as a conversion:
+	-- "%.1f%%" is fine inside this format string, but the RESULT is what gets
+	-- formatted again, and "2.5% of a frame" then dies with
+	-- "invalid option '% |'". "pct" has no such second meaning.
+	lines[3] = string.format("[perf] our Lua: %.3f ms/frame = %.1f pct of the frame at %.2f skeletons " ..
 		"(widget %.3f, scan %.3f)", per_frame, share, avg_markers,
 		perf.cpu_widget / perf.frames, perf.cpu_scan / perf.frames)
 
@@ -1229,8 +1251,8 @@ function template.perf_report()
 	local emit_pct = split_total > 0 and (perf.cpu_emit / split_total) * 100 or 0
 	local rest_pct = 100 - clear_pct - emit_pct
 
-	lines[4] = string.format("[perf] inside a widget frame: clear pool %.0f%% | %s %.0f%% | joints %.0f%%",
-		clear_pct, "draw writes", emit_pct, rest_pct)
+	lines[4] = string.format("[perf] inside a widget frame: clear pool %.0f pct | draw writes %.0f pct | " ..
+		"joints %.0f pct", clear_pct, emit_pct, rest_pct)
 
 	lines[5] = string.format("[perf] light sources drawn: %.0f/frame avg, %d max (beads + joint dots), " ..
 		"%d markers max, skipped %d frames",
@@ -1626,7 +1648,10 @@ template.update_function = function(parent, ui_renderer, widget, marker, templat
 
 	update_frame(parent, ui_renderer, widget, marker, template_ref, dt, t)
 
-	perf.cpu_widget = perf.cpu_widget + (clock_ms() - t0)
+	local spent = clock_ms() - t0
+
+	perf.cpu_widget = perf.cpu_widget + spent
+	perf.cpu_frame = perf.cpu_frame + spent
 end
 
 -- Read by /stick_glow in MarkedStick.lua.

@@ -9,6 +9,23 @@ are archived under `build/dev/` and never shipped.
 > -- English, Simplified Chinese and Traditional Chinese now all read
 > **MarkedStick**. Nothing else in either build differs.
 
+## 1.2.2
+
+Fixes for the report added in 1.2.1 -- the first session it logged was useless,
+in two different ways, and both are now guarded by tests:
+
+- Frame time was divided by 1000 twice, so a 13 ms frame was logged as
+  "avg 0.01 ms (73671.7 fps)". Everything is milliseconds from ingestion now, and
+  an assertion pins 60 fps to "avg 16.00 ms (62.5 fps)".
+- The lines that carried a percent sign were destroyed by the log channel: DMF
+  runs every message through `string.format` again, so "2.5% of a frame" was read
+  as a conversion and logged as `string.format: invalid option '% |'` -- four
+  errors a minute, and the three most useful lines never appeared. The report now
+  says `pct`, and a new guard fails the suite if any line that reaches chat or the
+  log contains a literal percent sign.
+- The bucket line now also carries our own cost per bucket, so one session
+  separates "the frame got slower" from "our Lua got slower".
+
 ## 1.2.1
 
 - New `/stick_perf`, and the same report written to the DMF log every two
